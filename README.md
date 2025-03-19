@@ -1,98 +1,131 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Authify - 现代化身份认证与授权系统
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Authify 是一个基于 NestJS 构建的完整身份认证与授权解决方案，提供安全、可扩展的用户管理系统，支持多种认证方式和精细的权限控制。
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 功能特点
 
-## Description
+- **多种认证方式**：支持用户名/密码、邮箱验证、OAuth2.0 社交登录（Google、GitHub 等）
+- **JWT 认证**：使用 JWT 进行无状态身份验证，支持访问令牌和刷新令牌
+- **角色权限管理**：基于角色的访问控制 (RBAC)，灵活定义用户权限
+- **安全防护**：防止常见安全威胁，如 CSRF、XSS、SQL 注入等
+- **用户管理**：完整的用户生命周期管理，包括注册、验证、密码重置等
+- **高性能缓存**：集成 Redis 缓存，提高系统响应速度
+- **可扩展 API**：RESTful API 设计，易于集成到各类应用中
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 技术栈
 
-## Project setup
+- **后端框架**：NestJS
+- **数据库**：PostgreSQL
+- **缓存**：Redis
+- **认证**：JWT, OAuth2.0
+- **API 文档**：Swagger/OpenAPI
+- **测试**：Jest
 
-```bash
-$ npm install
-```
+## 快速开始
 
-## Compile and run the project
+### 前置条件
 
-```bash
-# development
-$ npm run start
+- Node.js (>= 16.x)
+- Docker 和 Docker Compose
+- PostgreSQL
+- Redis
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
+### 使用 Docker 启动开发环境
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+# 启动 PostgreSQL 和 Redis
+docker-compose up -d
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 安装依赖
 
 ```bash
-$ npm install -g mau
-$ mau deploy
+npm install
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 配置环境变量
 
-## Resources
+```bash
+# 复制环境变量示例文件
+cp .env.example .env
 
-Check out a few resources that may come in handy when working with NestJS:
+# 根据需要修改 .env 文件中的配置
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### 运行应用
 
-## Support
+```bash
+# 开发模式
+npm run start:dev
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+# 生产模式
+npm run build
+npm run start:prod
+```
 
-## Stay in touch
+### 运行测试
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```bash
+# 单元测试
+npm run test
 
-## License
+# E2E 测试
+npm run test:e2e
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+# 测试覆盖率
+npm run test:cov
+```
+
+## API 文档
+
+启动应用后，访问 `http://localhost:3000/api/docs` 查看 Swagger API 文档。
+
+## 项目结构
+
+```
+src/
+├── auth/             # 认证相关模块
+├── common/           # 公共组件、实体和工具
+├── config/           # 配置模块
+├── sso/              # 社交登录模块
+├── user/             # 用户管理模块
+├── app.module.ts     # 应用主模块
+└── main.ts           # 应用入口
+```
+
+## 部署
+
+### 使用 Docker 部署
+
+```bash
+# 构建 Docker 镜像
+docker build -t authify .
+
+# 运行容器
+docker run -p 3000:3000 --env-file .env authify
+```
+
+### 环境变量配置
+
+部署时需要配置的关键环境变量：
+
+- `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`: 数据库连接信息
+- `REDIS_HOST`, `REDIS_PORT`: Redis 连接信息
+- `JWT_SECRET`: JWT 签名密钥
+- 社交登录相关配置: `GOOGLE_CLIENT_ID`, `GITHUB_CLIENT_ID` 等
+
+## 贡献指南
+
+1. Fork 项目
+2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
+3. 提交更改 (`git commit -m 'Add some amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 创建 Pull Request
+
+## 许可证
+
+本项目采用 MIT 许可证 - 详情请参阅 [LICENSE](LICENSE) 文件。
+
+## 联系方式
+
+如有问题或建议，请通过 Issues 或 Pull Requests 与我们联系。
