@@ -31,6 +31,7 @@ import { JwtModule } from '@nestjs/jwt';
       inject: [ConfigService],
       useFactory: (configService: ConfigService): TypeOrmModuleOptions => {
         const dbConfig = configService.get<TypeOrmModuleOptions>('database');
+        console.log('Database Config:', dbConfig); // 调试输出
         return {
           ...dbConfig,
           autoLoadEntities: true,
