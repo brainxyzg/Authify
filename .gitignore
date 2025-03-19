@@ -11,8 +11,10 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+# 环境变量文件
 .env
-.env.test
+.env.*
+!.env.example
 
 # 操作系统
 .DS_Store
@@ -36,12 +38,6 @@ lerna-debug.log*
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
-
-# 环境变量文件
-.env
-.env.*
-!.env.example
-!.env.test
 
 # 临时文件
 /tmp
