@@ -1,6 +1,15 @@
-import { Controller, Get, Param, Query, Res, HttpStatus, HttpException, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  Res,
+  HttpStatus,
+  HttpException,
+  UseGuards,
+} from '@nestjs/common';
 import { SsoService } from './sso.service';
-import { InitiateSsoDto, SsoCallbackDto, } from './models/sso.dto';
+import { InitiateSsoDto, SsoCallbackDto } from './models/sso.dto';
 import { Response } from 'express';
 import { RateLimitingGuard } from '../common/middleware/rate-limiting.guard';
 import { Throttle } from '../common/decorators/throttle.decorator';
@@ -28,7 +37,11 @@ export class SsoController {
     @Query() query: SsoCallbackDto,
     @Res() res: Response,
   ): Promise<void> {
-    const result = await this.ssoService.handleSsoCallback(params.provider, query.code, query.state);
+    const result = await this.ssoService.handleSsoCallback(
+      params.provider,
+      query.code,
+      query.state,
+    );
     if (result.status === 'error') {
       throw new HttpException(result, HttpStatus.BAD_REQUEST);
     }

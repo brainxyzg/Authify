@@ -3,7 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../common/entities/user.entity';
 import { EmailVerification } from '../common/entities/email-verification.entity';
-import { UpdateUserInfoDto, ChangePasswordDto, VerifyEmailDto, UserInfoResponseDto, UpdateUserInfoResponseDto, VerifyEmailResponseDto } from './models/users.dto';
+import {
+  UpdateUserInfoDto,
+  ChangePasswordDto,
+  VerifyEmailDto,
+  UserInfoResponseDto,
+  UpdateUserInfoResponseDto,
+  VerifyEmailResponseDto,
+} from './models/users.dto';
 import { ApiResponse } from '../common/models/api-response.dto';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
@@ -46,7 +53,10 @@ export class UsersService {
     };
   }
 
-  async updateUserInfo(userId: number, updateDto: UpdateUserInfoDto): Promise<ApiResponse<UpdateUserInfoResponseDto | null>> {
+  async updateUserInfo(
+    userId: number,
+    updateDto: UpdateUserInfoDto,
+  ): Promise<ApiResponse<UpdateUserInfoResponseDto | null>> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       return {
@@ -58,11 +68,13 @@ export class UsersService {
     }
 
     if (updateDto.username) {
-      const existingUser = await this.userRepository.findOne({ where: { username: updateDto.username } });
+      const existingUser = await this.userRepository.findOne({
+        where: { username: updateDto.username },
+      });
       if (existingUser && existingUser.id !== userId) {
         return {
           status: 'error',
-          data: { username: user.username},
+          data: { username: user.username },
           message: 'Update failed',
           code: 'USERNAME_TAKEN',
         };
@@ -79,7 +91,10 @@ export class UsersService {
     };
   }
 
-  async changePassword(userId: number, changePasswordDto: ChangePasswordDto): Promise<ApiResponse<null>> {
+  async changePassword(
+    userId: number,
+    changePasswordDto: ChangePasswordDto,
+  ): Promise<ApiResponse<null>> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       return {
@@ -90,7 +105,10 @@ export class UsersService {
       };
     }
 
-    const isOldPasswordValid = await bcrypt.compare(changePasswordDto.old_password, user.passwordHash);
+    const isOldPasswordValid = await bcrypt.compare(
+      changePasswordDto.old_password,
+      user.passwordHash,
+    );
     if (!isOldPasswordValid) {
       return {
         status: 'error',
@@ -135,13 +153,13 @@ export class UsersService {
     // 修改这部分代码
     const code = randomBytes(3).toString('hex').toUpperCase(); // 6 字符验证码
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24小时有效期
-    
+
     // 创建一个符合 EmailVerification 实体结构的对象
     const verification = new EmailVerification();
     verification.user = user;
     verification.token = code;
     verification.expiresAt = expiresAt;
-    
+
     await this.emailVerificationRepository.save(verification);
 
     // TODO: 发送邮件逻辑（集成邮件服务）
@@ -155,7 +173,10 @@ export class UsersService {
     };
   }
 
-  async verifyEmail(userId: number, verifyDto: VerifyEmailDto): Promise<ApiResponse<VerifyEmailResponseDto | null>> {
+  async verifyEmail(
+    userId: number,
+    verifyDto: VerifyEmailDto,
+  ): Promise<ApiResponse<VerifyEmailResponseDto | null>> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       return {

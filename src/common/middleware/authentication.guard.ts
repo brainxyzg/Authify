@@ -1,4 +1,10 @@
-import { Injectable, CanActivate, ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import { Redis } from 'ioredis';
 import { JwtService } from '@nestjs/jwt';
@@ -23,7 +29,12 @@ export class AuthenticationGuard implements CanActivate {
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new HttpException(
-        { status: 'error', data: null, message: 'Missing or invalid Authorization header', code: 'MISSING_TOKEN' },
+        {
+          status: 'error',
+          data: null,
+          message: 'Missing or invalid Authorization header',
+          code: 'MISSING_TOKEN',
+        },
         HttpStatus.UNAUTHORIZED,
       );
     }
@@ -54,7 +65,9 @@ export class AuthenticationGuard implements CanActivate {
     }
 
     // 检查数据库黑名单（缓存未命中时）
-    const blacklistedToken = await this.blacklistedTokenRepository.findOne({ where: { tokenIdentifier } });
+    const blacklistedToken = await this.blacklistedTokenRepository.findOne({
+      where: { tokenIdentifier },
+    });
     if (blacklistedToken) {
       await this.redis.setex(blacklistKey, 3600, 'true'); // 缓存 1 小时
       throw new HttpException(

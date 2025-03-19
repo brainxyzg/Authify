@@ -1,0 +1,44 @@
+# 构建输出
+dist
+build
+coverage
+
+# 依赖
+node_modules
+
+# 包管理器锁文件
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# 环境变量文件
+.env*
+!.env.example
+
+# 日志文件
+logs
+*.log
+
+# 测试覆盖率报告
+.nyc_output
+
+# 临时文件
+tmp
+temp
+
+# 自动生成的文件
+*.generated.*
+*.d.ts
+
+# 大型二进制文件
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.pdf
+*.zip
+
+# 其他不需要格式化的文件
+LICENSE
+*.md

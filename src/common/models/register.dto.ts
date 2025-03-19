@@ -1,5 +1,5 @@
 export class RegisterResponseDto {
-    user_id: string;
-    username: string;
-    email: string;
-  }
+  user_id: string;
+  username: string;
+  email: string;
+}

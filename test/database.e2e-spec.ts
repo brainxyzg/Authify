@@ -38,7 +38,7 @@ describe('Database Connection (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     configService = moduleFixture.get<ConfigService>(ConfigService);
-    
+
     // 打印数据库连接URL
     const dbHost = configService.get('DB_HOST');
     const dbPort = configService.get('DB_PORT');
@@ -46,7 +46,7 @@ describe('Database Connection (e2e)', () => {
     const dbPass = configService.get('DB_PASSWORD');
     const dbName = configService.get('DB_NAME');
     console.log(`数据库连接URL: postgres://${dbUser}:${dbPass}@${dbHost}:${dbPort}/${dbName}`);
-    
+
     await app.init();
 
     // 获取 TypeORM 的 DataSource 实例
@@ -57,7 +57,8 @@ describe('Database Connection (e2e)', () => {
     if (dataSource && dataSource.isInitialized) {
       await dataSource.destroy(); // 关闭数据库连接
     }
-    if (app) { // 添加条件检查，防止 app 未定义时调用 close
+    if (app) {
+      // 添加条件检查，防止 app 未定义时调用 close
       await app.close();
     }
   });
@@ -65,7 +66,7 @@ describe('Database Connection (e2e)', () => {
   it('should connect to PostgreSQL and perform basic CRUD', async () => {
     // 确认数据库连接已初始化
     expect(dataSource.isInitialized).toBe(true);
-    
+
     // 打印数据库连接信息
     console.log('数据库连接状态:', dataSource.isInitialized ? '已连接' : '未连接');
     console.log('数据库类型:', dataSource.options.type);

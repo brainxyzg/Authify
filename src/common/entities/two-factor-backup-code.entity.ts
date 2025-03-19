@@ -21,6 +21,6 @@ export class TwoFactorBackupCode {
   @Column({ type: 'timestamptz', nullable: true })
   usedAt?: Date;
 
-  @ManyToOne(() => User, (user) => user.twoFactorBackupCodes, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, user => user.twoFactorBackupCodes, { onDelete: 'CASCADE' })
   user: User;
 }

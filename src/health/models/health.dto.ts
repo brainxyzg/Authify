@@ -14,4 +14,6 @@ export class HealthErrorResponseDto {
 }
 
 // API 响应类型
-export type HealthCheckApiResponse = ApiResponse<HealthCheckResponseDto | HealthErrorResponseDto | null>;
+export type HealthCheckApiResponse = ApiResponse<
+  HealthCheckResponseDto | HealthErrorResponseDto | null
+>;

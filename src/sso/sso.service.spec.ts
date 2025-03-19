@@ -15,7 +15,7 @@ describe('SsoService', () => {
   const mockLoginMethodRepository = { create: jest.fn(), save: jest.fn() };
   const mockJwtService = { sign: jest.fn(() => 'mock-jwt') };
   const mockConfigService = {
-    get: jest.fn((key) => {
+    get: jest.fn(key => {
       const config = {
         GOOGLE_CLIENT_ID: 'google-id',
         GOOGLE_CLIENT_SECRET: 'google-secret',
@@ -64,11 +64,20 @@ describe('SsoService', () => {
 
   describe('handleSsoCallback', () => {
     it('should handle Google callback and return tokens with valid state', async () => {
-      jest.spyOn(global, 'fetch').mockImplementationOnce(() =>
-        Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: 'google-token' }) } as any),
-      ).mockImplementationOnce(() =>
-        Promise.resolve({ ok: true, json: () => Promise.resolve({ email: 'john@example.com', sub: '123' }) } as any),
-      );
+      jest
+        .spyOn(global, 'fetch')
+        .mockImplementationOnce(() =>
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ access_token: 'google-token' }),
+          } as any),
+        )
+        .mockImplementationOnce(() =>
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ email: 'john@example.com', sub: '123' }),
+          } as any),
+        );
       mockUserRepository.findOne.mockResolvedValue(null);
       mockUserRepository.create.mockReturnValue({ id: 1, email: 'john@example.com' });
       mockUserRepository.save.mockResolvedValue({ id: 1, email: 'john@example.com' });
@@ -83,9 +92,11 @@ describe('SsoService', () => {
     });
 
     it('should return error for invalid code', async () => {
-      jest.spyOn(global, 'fetch').mockImplementation(() =>
-        Promise.resolve({ ok: false, json: () => Promise.resolve({}) } as any),
-      );
+      jest
+        .spyOn(global, 'fetch')
+        .mockImplementation(() =>
+          Promise.resolve({ ok: false, json: () => Promise.resolve({}) } as any),
+        );
 
       const result = await service.handleSsoCallback(SsoProvider.GOOGLE, 'invalid-code');
       expect(result.status).toBe('error');

@@ -7,10 +7,7 @@ import { PasswordReset } from '../common/entities/password-reset.entity';
 import { CommonModule } from '../common/common.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([User, PasswordReset]),
-    CommonModule,
-  ],
+  imports: [TypeOrmModule.forFeature([User, PasswordReset]), CommonModule],
   providers: [PublicService],
   controllers: [PublicController],
 })

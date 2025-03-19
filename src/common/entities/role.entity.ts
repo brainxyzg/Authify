@@ -15,6 +15,6 @@ export class Role {
   @CreateDateColumn({ type: 'timestamptz', default: () => 'NOW()' })
   createdAt: Date;
 
-  @OneToMany(() => UserRole, (userRole) => userRole.role)
+  @OneToMany(() => UserRole, userRole => userRole.role)
   userRoles: UserRole[];
 }

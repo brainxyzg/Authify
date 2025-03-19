@@ -1,4 +1,13 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, HttpException, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  HttpCode,
+  HttpStatus,
+  HttpException,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { TwoFactorService } from './twofactor.service';
 import { Verify2FADto } from './models/twofactor.dto';
 import { ApiResponse } from '../common/models/api-response.dto';
@@ -30,7 +39,10 @@ export class TwoFactorController {
   async verify2FA(@Req() req, @Body() verifyDto: Verify2FADto): Promise<ApiResponse<any>> {
     const result = await this.twoFactorService.verify2FA(req.user.sub, verifyDto);
     if (result.status === 'error') {
-      throw new HttpException(result, result.data ? HttpStatus.BAD_REQUEST : HttpStatus.UNAUTHORIZED);
+      throw new HttpException(
+        result,
+        result.data ? HttpStatus.BAD_REQUEST : HttpStatus.UNAUTHORIZED,
+      );
     }
     return result;
   }

@@ -91,13 +91,19 @@ export class AuthService {
     };
   }
 
-  async refreshToken(refreshTokenDto: RefreshTokenDto): Promise<ApiResponse<RefreshTokenResponseDto|null>> {
+  async refreshToken(
+    refreshTokenDto: RefreshTokenDto,
+  ): Promise<ApiResponse<RefreshTokenResponseDto | null>> {
     const token = await this.refreshTokenRepository.findOne({
       where: { tokenHash: refreshTokenDto.refreshToken },
       relations: ['user'],
     });
 
-    if (!token || token.expiresAt < new Date() || await this.redisService.get(`blacklist:${token.tokenHash}`)) {
+    if (
+      !token ||
+      token.expiresAt < new Date() ||
+      (await this.redisService.get(`blacklist:${token.tokenHash}`))
+    ) {
       return {
         status: 'error',
         data: null,
@@ -107,12 +113,18 @@ export class AuthService {
     }
 
     const payload = this.jwtService.verify(refreshTokenDto.refreshToken);
-    const newAccessToken = this.jwtService.sign({ sub: payload.sub, username: payload.username }, {
-      expiresIn: this.configService.get('JWT_ACCESS_TOKEN_EXPIRY', '1h'),
-    });
-    const newRefreshToken = this.jwtService.sign({ sub: payload.sub, username: payload.username }, {
-      expiresIn: this.configService.get('JWT_REFRESH_TOKEN_EXPIRY', '7d'),
-    });
+    const newAccessToken = this.jwtService.sign(
+      { sub: payload.sub, username: payload.username },
+      {
+        expiresIn: this.configService.get('JWT_ACCESS_TOKEN_EXPIRY', '1h'),
+      },
+    );
+    const newRefreshToken = this.jwtService.sign(
+      { sub: payload.sub, username: payload.username },
+      {
+        expiresIn: this.configService.get('JWT_REFRESH_TOKEN_EXPIRY', '7d'),
+      },
+    );
 
     // 更新刷新令牌
     token.tokenHash = newRefreshToken;
@@ -120,7 +132,11 @@ export class AuthService {
     await this.refreshTokenRepository.save(token);
 
     // 将旧刷新令牌加入黑名单
-    await this.redisService.set(`blacklist:${refreshTokenDto.refreshToken}`, 'true', 7 * 24 * 60 * 60);
+    await this.redisService.set(
+      `blacklist:${refreshTokenDto.refreshToken}`,
+      'true',
+      7 * 24 * 60 * 60,
+    );
 
     return {
       status: 'success',
@@ -136,9 +152,11 @@ export class AuthService {
 
   async logout(token: string): Promise<ApiResponse<null>> {
     const decoded = this.jwtService.verify(token);
-    const refreshToken = await this.refreshTokenRepository.findOne({ where: { user: { id: decoded.sub } } });
+    const refreshToken = await this.refreshTokenRepository.findOne({
+      where: { user: { id: decoded.sub } },
+    });
 
-    if (!refreshToken || await this.redisService.get(`blacklist:${token}`)) {
+    if (!refreshToken || (await this.redisService.get(`blacklist:${token}`))) {
       return {
         status: 'error',
         data: null,

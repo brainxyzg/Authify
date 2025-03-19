@@ -1,4 +1,13 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, HttpException, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  HttpCode,
+  HttpStatus,
+  HttpException,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto, LoginResponseDto } from './models/login.dto';
 import { RefreshTokenDto, RefreshTokenResponseDto } from './models/refresh-token.dto';
@@ -27,7 +36,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Throttle(60 * 60, 20) // 20 次/小时
   @UseGuards(RateLimitingGuard)
-  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto): Promise<ApiResponse<RefreshTokenResponseDto | null>> {
+  async refreshToken(
+    @Body() refreshTokenDto: RefreshTokenDto,
+  ): Promise<ApiResponse<RefreshTokenResponseDto | null>> {
     const result = await this.authService.refreshToken(refreshTokenDto);
     if (result.status === 'error') {
       throw new HttpException(result, HttpStatus.UNAUTHORIZED);

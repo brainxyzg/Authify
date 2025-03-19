@@ -82,14 +82,14 @@ result, err := h.services.SomeService.SomeOperation(req.Param1, req.Param2)
 if err != nil {
     // 添加日志记录
     log.Printf("操作失败: %v", err)
-    
+
     // 根据错误类型返回不同的响应
     if err.Error() == "特定错误信息" {
         w.WriteHeader(http.StatusBadRequest)
         json.NewEncoder(w).Encode(models.NewErrorResponse("用户友好的错误信息", "ERROR_CODE"))
         return
     }
-    
+
     // 其他错误作为内部错误处理
     w.WriteHeader(http.StatusInternalServerError)
     json.NewEncoder(w).Encode(models.NewErrorResponse("操作失败", "INTERNAL_ERROR"))
@@ -124,11 +124,11 @@ func (h *Handler) validateRequestStruct(req *RequestStruct) error {
     if len(req.Field) < MinFieldLength || len(req.Field) > MaxFieldLength {
         return NewValidationError("field", "字段长度必须在X-Y个字符之间")
     }
-    
+
     if !fieldRegex.MatchString(req.Field) {
         return NewValidationError("field", "字段格式无效")
     }
-    
+
     return nil
 }
 ```
@@ -177,25 +177,25 @@ log.Printf("用户 %s 使用密码 %s 尝试登录", req.Username, req.Password)
 func (h *Handler) ExampleHandler(w http.ResponseWriter, r *http.Request) {
     // 限制请求体大小
     r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-    
+
     // 验证HTTP方法
     if r.Method != http.MethodPost {
         w.WriteHeader(http.StatusMethodNotAllowed)
         json.NewEncoder(w).Encode(models.NewErrorResponse("方法不允许", "METHOD_NOT_ALLOWED"))
         return
     }
-    
+
     // 解析请求体
     var req ExampleRequest
     decoder := json.NewDecoder(r.Body)
     decoder.DisallowUnknownFields()
-    
+
     if err := decoder.Decode(&req); err != nil {
         w.WriteHeader(http.StatusBadRequest)
         json.NewEncoder(w).Encode(models.NewErrorResponse("无效的请求格式", "INVALID_REQUEST_FORMAT"))
         return
     }
-    
+
     // 验证请求参数
     if err := h.validateExampleRequest(&req); err != nil {
         if validationErr, ok := err.(*ValidationError); ok {
@@ -207,23 +207,23 @@ func (h *Handler) ExampleHandler(w http.ResponseWriter, r *http.Request) {
             return
         }
     }
-    
+
     // 处理业务逻辑
     result, err := h.services.SomeService.SomeOperation(req.Param)
     if err != nil {
         log.Printf("操作失败: %v", err)
-        
+
         if err.Error() == "特定错误信息" {
             w.WriteHeader(http.StatusBadRequest)
             json.NewEncoder(w).Encode(models.NewErrorResponse("用户友好的错误信息", "EXAMPLE_ERROR"))
             return
         }
-        
+
         w.WriteHeader(http.StatusInternalServerError)
         json.NewEncoder(w).Encode(models.NewErrorResponse("操作失败", "EXAMPLE_INTERNAL_ERROR"))
         return
     }
-    
+
     // 返回成功响应
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(models.NewSuccessResponse(

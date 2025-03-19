@@ -48,7 +48,10 @@ describe('UsersService', () => {
       providers: [
         UsersService,
         { provide: getRepositoryToken(User), useValue: mockUserRepository },
-        { provide: getRepositoryToken(EmailVerification), useValue: mockEmailVerificationRepository },
+        {
+          provide: getRepositoryToken(EmailVerification),
+          useValue: mockEmailVerificationRepository,
+        },
       ],
     }).compile();
 
@@ -89,7 +92,10 @@ describe('UsersService', () => {
 
   describe('changePassword', () => {
     it('should change password', async () => {
-      const changeDto: ChangePasswordDto = { old_password: 'Passw0rd123', new_password: 'NewPass123' };
+      const changeDto: ChangePasswordDto = {
+        old_password: 'Passw0rd123',
+        new_password: 'NewPass123',
+      };
       mockUserRepository.findOne.mockResolvedValue(mockUser);
       // 使用 jest.mock 而不是 spyOn
       // jest.spyOn(bcrypt, 'hash').mockResolvedValue('new-hash' as never); // 删除这行
@@ -132,7 +138,10 @@ describe('UsersService', () => {
     it('should verify email', async () => {
       const verifyDto: VerifyEmailDto = { code: 'ABC123' };
       mockUserRepository.findOne.mockResolvedValue(mockUser);
-      mockEmailVerificationRepository.findOne.mockResolvedValue({ code: 'ABC123', expiresAt: new Date(Date.now() + 1000) });
+      mockEmailVerificationRepository.findOne.mockResolvedValue({
+        code: 'ABC123',
+        expiresAt: new Date(Date.now() + 1000),
+      });
       mockUserRepository.save.mockResolvedValue({ ...mockUser, isEmailVerified: true });
 
       const result = await service.verifyEmail(1, verifyDto);

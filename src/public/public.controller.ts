@@ -1,4 +1,12 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, HttpException, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  HttpCode,
+  HttpStatus,
+  HttpException,
+  UseGuards,
+} from '@nestjs/common';
 import { PublicService } from './public.service';
 import { RegisterDto } from './models/register.dto';
 import { RegisterResponseDto } from './models/register.dto';
@@ -16,7 +24,9 @@ export class PublicController {
   @HttpCode(HttpStatus.CREATED)
   @Throttle(60, 10)
   @UseGuards(RateLimitingGuard)
-  async register(@Body() registerDto: RegisterDto): Promise<ApiResponse<RegisterResponseDto | null>> {
+  async register(
+    @Body() registerDto: RegisterDto,
+  ): Promise<ApiResponse<RegisterResponseDto | null>> {
     const result = await this.publicService.register(registerDto);
     if (result.status === 'error') {
       throw new HttpException(result, HttpStatus.BAD_REQUEST);

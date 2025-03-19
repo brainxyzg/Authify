@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, Unique } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  Unique,
+} from 'typeorm';
 import { User } from './user.entity';
 
 @Entity('Login_Methods')
@@ -19,6 +26,6 @@ export class LoginMethod {
   @CreateDateColumn({ type: 'timestamptz', default: () => 'NOW()' })
   createdAt: Date;
 
-  @ManyToOne(() => User, (user) => user.loginMethods, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, user => user.loginMethods, { onDelete: 'CASCADE' })
   user: User;
 }

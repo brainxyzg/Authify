@@ -1,4 +1,5 @@
-以下是基于前述分析和改进建议的 **完整版数据库设计**，使用 PostgreSQL 实现。该设计完全支持完整版认证 API 文档中的所有端点（包括公共端点、认证端点、用户端点、两步验证端点、单点登录端点、健康检查端点和角色管理端点）。设计遵循第三范式，包含适当的约束、索引和注释，确保安全性、性能和可扩展性。
+以下是基于前述分析和改进建议的
+**完整版数据库设计**，使用 PostgreSQL 实现。该设计完全支持完整版认证 API 文档中的所有端点（包括公共端点、认证端点、用户端点、两步验证端点、单点登录端点、健康检查端点和角色管理端点）。设计遵循第三范式，包含适当的约束、索引和注释，确保安全性、性能和可扩展性。
 
 ---
 
@@ -213,36 +214,54 @@ $$;
 ### 设计验证与 API 端点支持
 
 #### 1. 公共端点（Public Endpoints）
-- **用户注册 (`POST /api/v1/public/register`)**: `Users` 表支持 `email`、`username` 和 `password_hash`，唯一约束确保不重复。
+
+- **用户注册 (`POST /api/v1/public/register`)**: `Users` 表支持 `email`、`username` 和
+  `password_hash`，唯一约束确保不重复。
 - **忘记密码 (`POST /api/v1/public/forgot-password`)**: `Password_Resets` 表存储重置 token。
-- **重置密码 (`POST /api/v1/public/reset-password`)**: `Password_Resets` 和 `Users` 表支持 token 验证和密码更新。
+- **重置密码 (`POST /api/v1/public/reset-password`)**: `Password_Resets` 和 `Users`
+  表支持 token 验证和密码更新。
 
 #### 2. 认证端点（Authentication Endpoints）
-- **用户登录 (`POST /api/v1/auth/login`)**: `Users` 表验证密码，`Two_Factor_Settings` 支持 2FA，`Refresh_Tokens` 存储刷新令牌。
-- **刷新访问令牌 (`POST /api/v1/auth/token/refresh`)**: `Refresh_Tokens` 和 `Blacklisted_Tokens` 支持刷新和黑名单。
+
+- **用户登录 (`POST /api/v1/auth/login`)**: `Users` 表验证密码，`Two_Factor_Settings`
+  支持 2FA，`Refresh_Tokens` 存储刷新令牌。
+- **刷新访问令牌 (`POST /api/v1/auth/token/refresh`)**: `Refresh_Tokens` 和 `Blacklisted_Tokens`
+  支持刷新和黑名单。
 - **登出 (`POST /api/v1/auth/logout`)**: `Blacklisted_Tokens` 存储失效令牌。
 
 #### 3. 用户端点（User Endpoints）
-- **获取用户信息 (`GET /api/v1/users/me`)**: `Users`、`Two_Factor_Settings` 和 `User_Roles` 提供完整信息。
-- **更新用户信息 (`PATCH /api/v1/users/me`)**: `Users` 表支持 `username` 更新，触发器更新 `updated_at`。
+
+- **获取用户信息 (`GET /api/v1/users/me`)**: `Users`、`Two_Factor_Settings` 和 `User_Roles`
+  提供完整信息。
+- **更新用户信息 (`PATCH /api/v1/users/me`)**: `Users` 表支持 `username` 更新，触发器更新
+  `updated_at`。
 - **修改密码 (`PATCH /api/v1/users/me/password`)**: `Users` 表支持密码更新。
-- **发送邮箱验证邮件 (`POST /api/v1/users/me/verify-email/send`)**: `Email_Verifications` 存储 token。
-- **验证邮箱 (`PATCH /api/v1/users/me/verify-email`)**: `Email_Verifications` 和 `Users` 支持验证和状态更新。
+- **发送邮箱验证邮件 (`POST /api/v1/users/me/verify-email/send`)**: `Email_Verifications`
+  存储 token。
+- **验证邮箱 (`PATCH /api/v1/users/me/verify-email`)**: `Email_Verifications` 和 `Users`
+  支持验证和状态更新。
 
 #### 4. 两步验证端点（2FA Endpoints）
-- **启用 2FA (`POST /api/v1/2fa/enable`)**: `Two_Factor_Settings` 存储 `secret`，`Two_Factor_Backup_Codes` 存储备份码。
+
+- **启用 2FA (`POST /api/v1/2fa/enable`)**: `Two_Factor_Settings` 存储
+  `secret`，`Two_Factor_Backup_Codes` 存储备份码。
 - **验证 2FA (`POST /api/v健康检查1/2fa/verify`)**: `Two_Factor_Settings` 支持验证和启用。
 - **禁用 2FA (`POST /api/v1/2fa/disable`)**: `Two_Factor_Settings` 支持状态更新。
-- **生成备份码 (`POST /api/v1/2fa/backup-codes/generate`)**: `Two_Factor_Backup_Codes` 支持新码生成。
+- **生成备份码 (`POST /api/v1/2fa/backup-codes/generate`)**: `Two_Factor_Backup_Codes`
+  支持新码生成。
 
 #### 5. 单点登录端点（SSO Endpoints）
+
 - **发起 SSO 登录 (`GET /api/v1/sso/{provider}`)**: 无需数据库直接支持。
-- **SSO 回调 (`GET /api/v1/sso/{provider}/callback`)**: `Login_Methods` 和 `Users` 支持用户关联和令牌颁发。
+- **SSO 回调 (`GET /api/v1/sso/{provider}/callback`)**: `Login_Methods` 和 `Users`
+  支持用户关联和令牌颁发。
 
 #### 6. 健康检查端点（Health Check Endpoint）
+
 - **健康检查 (`GET /api/v1/health`)**: 无需特定表，数据库连接状态由后端检查。
 
 #### 7. 角色管理端点（Role Management Endpoints）
+
 - **获取角色列表 (`GET /api/v1/admin/roles`)**: `Roles` 表支持。
 - **创建角色 (`POST /api/v1/admin/roles`)**: `Roles` 表支持 `name` 和 `description`。
 - **更新角色 (`PATCH /api/v1/admin/roles/{id}`)**: `Roles` 表支持更新。
@@ -252,13 +271,14 @@ $$;
 ---
 
 ### 设计亮点
+
 1. **一致性**: 所有 API 端点均有数据库支持，字段长度和约束与参数要求对齐。
-2. **安全性**: 
+2. **安全性**:
    - 使用 bcrypt 和 SHA-512 哈希存储敏感数据。
    - 外键约束和唯一性检查确保数据完整性。
    - `Blacklisted_Tokens` 表增强登出安全。
 3. **性能优化**: 索引覆盖高频查询（如登录、令牌验证）。
-4. **可维护性**: 
+4. **可维护性**:
    - 触发器自动更新 `updated_at`。
    - 提供清理过期记录的存储过程。
 5. **扩展性**: 支持角色管理、SSO 和未来的功能扩展。
@@ -266,6 +286,7 @@ $$;
 ---
 
 ### 使用说明
+
 1. **初始化**: 执行上述 SQL 脚本创建数据库和表。
 2. **开发**: 使用 Python（SQLAlchemy）、Go（database/sql）或 Next.js（pg 驱动）连接。
 3. **维护**: 定期调用 `cleanup_expired_records` 清理过期数据。

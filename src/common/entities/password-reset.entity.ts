@@ -21,6 +21,6 @@ export class PasswordReset {
   @Column({ type: 'boolean', default: false, nullable: false })
   isUsed: boolean;
 
-  @ManyToOne(() => User, (user) => user.passwordResets, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, user => user.passwordResets, { onDelete: 'CASCADE' })
   user: User;
 }

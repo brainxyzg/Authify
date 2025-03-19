@@ -40,14 +40,20 @@ describe('UsersController', () => {
   });
 
   it('should update user info', async () => {
-    mockUsersService.updateUserInfo.mockResolvedValue({ status: 'success', data: { username: 'newjohndoe' } });
+    mockUsersService.updateUserInfo.mockResolvedValue({
+      status: 'success',
+      data: { username: 'newjohndoe' },
+    });
     const result = await controller.updateUserInfo(mockRequest, { username: 'newjohndoe' });
     expect(result.status).toBe('success');
   });
 
   it('should change password', async () => {
     mockUsersService.changePassword.mockResolvedValue({ status: 'success', data: null });
-    const result = await controller.changePassword(mockRequest, { old_password: 'old', new_password: 'new' });
+    const result = await controller.changePassword(mockRequest, {
+      old_password: 'old',
+      new_password: 'new',
+    });
     expect(result.status).toBe('success');
   });
 
@@ -58,7 +64,10 @@ describe('UsersController', () => {
   });
 
   it('should verify email', async () => {
-    mockUsersService.verifyEmail.mockResolvedValue({ status: 'success', data: { is_email_verified: true } });
+    mockUsersService.verifyEmail.mockResolvedValue({
+      status: 'success',
+      data: { is_email_verified: true },
+    });
     const result = await controller.verifyEmail(mockRequest, { code: 'ABC123' });
     expect(result.status).toBe('success');
   });

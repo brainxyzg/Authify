@@ -24,6 +24,6 @@ export class RefreshToken {
   @Column({ type: 'text', nullable: true })
   userAgent?: string;
 
-  @ManyToOne(() => User, (user) => user.refreshTokens, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, user => user.refreshTokens, { onDelete: 'CASCADE' })
   user: User;
 }

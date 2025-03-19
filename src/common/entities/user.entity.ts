@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, OneToOne } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+  OneToOne,
+} from 'typeorm';
 import { UserRole } from './user-role.entity';
 import { RefreshToken } from './refresh-token.entity';
 import { BlacklistedToken } from './blacklisted-token.entity';
@@ -34,27 +42,27 @@ export class User {
   @UpdateDateColumn({ type: 'timestamptz', default: () => 'NOW()' })
   updatedAt: Date;
 
-  @OneToMany(() => UserRole, (userRole) => userRole.user)
+  @OneToMany(() => UserRole, userRole => userRole.user)
   userRoles: UserRole[];
 
-  @OneToMany(() => RefreshToken, (refreshToken) => refreshToken.user)
+  @OneToMany(() => RefreshToken, refreshToken => refreshToken.user)
   refreshTokens: RefreshToken[];
 
-  @OneToMany(() => BlacklistedToken, (blacklistedToken) => blacklistedToken.user)
+  @OneToMany(() => BlacklistedToken, blacklistedToken => blacklistedToken.user)
   blacklistedTokens: BlacklistedToken[];
 
-  @OneToOne(() => TwoFactorSetting, (twoFactorSetting) => twoFactorSetting.user)
+  @OneToOne(() => TwoFactorSetting, twoFactorSetting => twoFactorSetting.user)
   twoFactorSetting?: TwoFactorSetting;
 
-  @OneToMany(() => TwoFactorBackupCode, (backupCode) => backupCode.user)
+  @OneToMany(() => TwoFactorBackupCode, backupCode => backupCode.user)
   twoFactorBackupCodes: TwoFactorBackupCode[];
 
-  @OneToMany(() => EmailVerification, (emailVerification) => emailVerification.user)
+  @OneToMany(() => EmailVerification, emailVerification => emailVerification.user)
   emailVerifications: EmailVerification[];
 
-  @OneToMany(() => PasswordReset, (passwordReset) => passwordReset.user)
+  @OneToMany(() => PasswordReset, passwordReset => passwordReset.user)
   passwordResets: PasswordReset[];
 
-  @OneToMany(() => LoginMethod, (loginMethod) => loginMethod.user)
+  @OneToMany(() => LoginMethod, loginMethod => loginMethod.user)
   loginMethods: LoginMethod[];
 }

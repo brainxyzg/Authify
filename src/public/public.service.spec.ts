@@ -1,7 +1,7 @@
 // 在文件顶部添加模块模拟
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('mocked-hash'),
-  compare: jest.fn().mockResolvedValue(true)
+  compare: jest.fn().mockResolvedValue(true),
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
@@ -65,7 +65,9 @@ describe('PublicService', () => {
 
     service = module.get<PublicService>(PublicService);
     userRepository = module.get<Repository<User>>(getRepositoryToken(User));
-    passwordResetRepository = module.get<Repository<PasswordReset>>(getRepositoryToken(PasswordReset));
+    passwordResetRepository = module.get<Repository<PasswordReset>>(
+      getRepositoryToken(PasswordReset),
+    );
   });
 
   afterEach(() => {
@@ -181,7 +183,9 @@ describe('PublicService', () => {
         message: 'Password reset successfully',
         code: 'SUCCESS_RESET_PASSWORD',
       });
-      expect(userRepository.update).toHaveBeenCalledWith(mockUser.id, { passwordHash: 'mocked-hash' });
+      expect(userRepository.update).toHaveBeenCalledWith(mockUser.id, {
+        passwordHash: 'mocked-hash',
+      });
       expect(passwordResetRepository.delete).toHaveBeenCalledWith({ id: mockPasswordReset.id });
     });
 

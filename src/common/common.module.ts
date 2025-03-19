@@ -66,13 +66,7 @@ import { BlacklistedToken } from './entities/blacklisted-token.entity';
     RateLimitingGuard,
     CsrfGuard,
   ],
-  exports: [
-    TypeOrmModule,
-    JwtGuard,
-    AuthenticationGuard,
-    RateLimitingGuard,
-    CsrfGuard,
-  ],
+  exports: [TypeOrmModule, JwtGuard, AuthenticationGuard, RateLimitingGuard, CsrfGuard],
 })
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

@@ -36,7 +36,11 @@ describe('SsoController', () => {
     it('should return tokens on successful callback', async () => {
       const successResponse = { status: 'success', data: { access_token: 'xyz' } };
       mockSsoService.handleSsoCallback.mockResolvedValue(successResponse);
-      await controller.handleSsoCallback({ provider: SsoProvider.GOOGLE }, { code: 'code' }, mockResponse as any);
+      await controller.handleSsoCallback(
+        { provider: SsoProvider.GOOGLE },
+        { code: 'code' },
+        mockResponse as any,
+      );
       expect(mockResponse.status).toHaveBeenCalledWith(200);
       expect(mockResponse.json).toHaveBeenCalledWith(successResponse);
     });
@@ -45,7 +49,11 @@ describe('SsoController', () => {
       const errorResponse = { status: 'error', code: 'INVALID_SSO_CODE' };
       mockSsoService.handleSsoCallback.mockResolvedValue(errorResponse);
       await expect(
-        controller.handleSsoCallback({ provider: SsoProvider.GOOGLE }, { code: 'invalid' }, mockResponse as any),
+        controller.handleSsoCallback(
+          { provider: SsoProvider.GOOGLE },
+          { code: 'invalid' },
+          mockResponse as any,
+        ),
       ).rejects.toThrow(HttpException);
     });
   });

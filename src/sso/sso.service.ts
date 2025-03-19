@@ -12,7 +12,10 @@ import { randomBytes } from 'crypto';
 
 @Injectable()
 export class SsoService {
-  private readonly providers: Record<SsoProvider, { clientId: string; clientSecret: string; redirectUri: string }>;
+  private readonly providers: Record<
+    SsoProvider,
+    { clientId: string; clientSecret: string; redirectUri: string }
+  >;
 
   constructor(
     @InjectRepository(User)
@@ -21,7 +24,7 @@ export class SsoService {
     private loginMethodRepository: Repository<LoginMethod>,
     private jwtService: JwtService,
     private configService: ConfigService,
-    private redisService: RedisService, 
+    private redisService: RedisService,
   ) {
     this.providers = {
       [SsoProvider.GOOGLE]: {
@@ -40,7 +43,12 @@ export class SsoService {
   async initiateSso(provider: SsoProvider): Promise<string> {
     if (!this.providers[provider]) {
       throw new HttpException(
-        { status: 'error', data: { field: 'provider', reason: 'Unsupported provider' }, message: 'Invalid provider', code: 'INVALID_PROVIDER' },
+        {
+          status: 'error',
+          data: { field: 'provider', reason: 'Unsupported provider' },
+          message: 'Invalid provider',
+          code: 'INVALID_PROVIDER',
+        },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -61,7 +69,11 @@ export class SsoService {
     return authUrl;
   }
 
-  async handleSsoCallback(provider: SsoProvider, code: string, state?: string): Promise<ApiResponse<SsoCallbackResponseDto | null>> {
+  async handleSsoCallback(
+    provider: SsoProvider,
+    code: string,
+    state?: string,
+  ): Promise<ApiResponse<SsoCallbackResponseDto | null>> {
     if (!this.providers[provider]) {
       return {
         status: 'error',
@@ -154,7 +166,12 @@ export class SsoService {
     };
   }
 
-  private async fetchGoogleToken(clientId: string, clientSecret: string, redirectUri: string, code: string): Promise<any> {
+  private async fetchGoogleToken(
+    clientId: string,
+    clientSecret: string,
+    redirectUri: string,
+    code: string,
+  ): Promise<any> {
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -178,11 +195,21 @@ export class SsoService {
     return response.json();
   }
 
-  private async fetchGithubToken(clientId: string, clientSecret: string, redirectUri: string, code: string): Promise<any> {
+  private async fetchGithubToken(
+    clientId: string,
+    clientSecret: string,
+    redirectUri: string,
+    code: string,
+  ): Promise<any> {
     const response = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
-      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, code }),
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        code,
+      }),
     });
     if (!response.ok) throw new Error('Failed to fetch GitHub token');
     return response.json();

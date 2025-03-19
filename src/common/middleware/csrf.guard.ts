@@ -1,4 +1,10 @@
-import { Injectable, CanActivate, ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import { Redis } from 'ioredis';
 import { randomBytes } from 'crypto';
@@ -26,13 +32,22 @@ export class CsrfGuard implements CanActivate {
       await this.redis.setex(`csrf:${newToken}`, 3600, newToken); // 存储 1 小时
       response.cookie('csrf_token', newToken, { httpOnly: true, secure: true });
       throw new HttpException(
-        { status: 'error', data: null, message: 'CSRF token required', code: 'CSRF_TOKEN_REQUIRED' },
+        {
+          status: 'error',
+          data: null,
+          message: 'CSRF token required',
+          code: 'CSRF_TOKEN_REQUIRED',
+        },
         HttpStatus.FORBIDDEN,
       );
     }
 
     // 验证 CSRF token
-    if (!csrfTokenFromHeader || !csrfTokenFromCookie || csrfTokenFromHeader !== csrfTokenFromCookie) {
+    if (
+      !csrfTokenFromHeader ||
+      !csrfTokenFromCookie ||
+      csrfTokenFromHeader !== csrfTokenFromCookie
+    ) {
       throw new HttpException(
         { status: 'error', data: null, message: 'Invalid CSRF token', code: 'INVALID_CSRF_TOKEN' },
         HttpStatus.FORBIDDEN,
@@ -43,7 +58,12 @@ export class CsrfGuard implements CanActivate {
     const storedToken = await this.redis.get(`csrf:${csrfTokenFromCookie}`);
     if (!storedToken || storedToken !== csrfTokenFromCookie) {
       throw new HttpException(
-        { status: 'error', data: null, message: 'Expired or invalid CSRF token', code: 'INVALID_CSRF_TOKEN' },
+        {
+          status: 'error',
+          data: null,
+          message: 'Expired or invalid CSRF token',
+          code: 'INVALID_CSRF_TOKEN',
+        },
         HttpStatus.FORBIDDEN,
       );
     }

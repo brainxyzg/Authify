@@ -1,27 +1,35 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
-import { JwtGuard } from './common/middleware/jwt.guard';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
-  // 启用全局验证管道
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true, // 过滤掉未在DTO中声明的属性
-    transform: true, // 自动转换类型
-    forbidNonWhitelisted: true, // 禁止未在DTO中声明的属性
-  }));
-  
-  // 启用CORS
-  app.enableCors();
 
-  app.useGlobalGuards(app.get(JwtGuard));
+  // 全局验证管道
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
 
-  // 设置全局前缀
+  // CORS 配置（生产环境应限制 origin）
+  app.enableCors({
+    origin: process.env.CORS_ORIGIN || '*', // 从环境变量读取
+  });
+
+  // 全局前缀
   app.setGlobalPrefix('api/v1');
-  
-  await app.listen(process.env.PORT ?? 3000);
-  console.log(`应用程序运行在: ${await app.getUrl()}`);
+
+  // 启动服务器并添加错误处理
+  try {
+    const port = process.env.PORT ?? 3000;
+    await app.listen(port);
+    Logger.log(`应用程序运行在: ${await app.getUrl()}`, 'Bootstrap');
+  } catch (error) {
+    Logger.error(`启动失败: ${error.message}`, 'Bootstrap');
+    process.exit(1);
+  }
 }
 bootstrap();

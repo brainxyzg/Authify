@@ -1,9 +1,13 @@
-import { Injectable  } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../common/entities/user.entity'; 
-import { HealthCheckApiResponse, HealthCheckResponseDto, HealthErrorResponseDto } from './models/health.dto';
-import { RedisService } from '../common/services/redis.service'; 
+import { User } from '../common/entities/user.entity';
+import {
+  HealthCheckApiResponse,
+  HealthCheckResponseDto,
+  HealthErrorResponseDto,
+} from './models/health.dto';
+import { RedisService } from '../common/services/redis.service';
 import { Logger } from '@nestjs/common';
 
 @Injectable()

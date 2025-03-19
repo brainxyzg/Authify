@@ -43,7 +43,11 @@ describe('PublicController', () => {
 
   // 测试 register 端点
   describe('register', () => {
-    const registerDto: RegisterDto = { username: 'test', email: 'test@example.com', password: 'password123' };
+    const registerDto: RegisterDto = {
+      username: 'test',
+      email: 'test@example.com',
+      password: 'password123',
+    };
 
     it('should successfully register a user', async () => {
       const successResponse: ApiResponse<RegisterResponseDto> = {

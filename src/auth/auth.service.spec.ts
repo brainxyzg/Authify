@@ -88,9 +88,7 @@ describe('AuthService', () => {
         .mockResolvedValueOnce(mockUser) // username 查询
         .mockResolvedValueOnce(mockUser); // relations 查询
       mockConfigService.get.mockReturnValue('1h').mockReturnValueOnce('7d');
-      mockJwtService.sign
-        .mockReturnValueOnce('access-token')
-        .mockReturnValueOnce('refresh-token');
+      mockJwtService.sign.mockReturnValueOnce('access-token').mockReturnValueOnce('refresh-token');
       mockRefreshTokenRepository.save.mockResolvedValue(mockRefreshToken);
 
       const result = await service.login(loginDto);
@@ -114,9 +112,7 @@ describe('AuthService', () => {
         .mockResolvedValueOnce(mockUser)
         .mockResolvedValueOnce({ ...mockUser, twoFactorSetting: mockTwoFactorSetting });
       mockTwoFactorService.validate2FACode.mockResolvedValue(true);
-      mockJwtService.sign
-        .mockReturnValueOnce('access-token')
-        .mockReturnValueOnce('refresh-token');
+      mockJwtService.sign.mockReturnValueOnce('access-token').mockReturnValueOnce('refresh-token');
       mockRefreshTokenRepository.save.mockResolvedValue(mockRefreshToken);
 
       const result = await service.login(loginDtoWith2FA);
@@ -175,7 +171,11 @@ describe('AuthService', () => {
         message: 'Token refreshed successfully',
         code: 'SUCCESS_REFRESH_TOKEN',
       });
-      expect(mockRedisService.set).toHaveBeenCalledWith('blacklist:refresh-token', 'true', 7 * 24 * 60 * 60);
+      expect(mockRedisService.set).toHaveBeenCalledWith(
+        'blacklist:refresh-token',
+        'true',
+        7 * 24 * 60 * 60,
+      );
     });
 
     it('should return error if refresh token is invalid or expired', async () => {
@@ -222,7 +222,11 @@ describe('AuthService', () => {
         code: 'SUCCESS_LOGOUT',
       });
       expect(mockRedisService.set).toHaveBeenCalledWith('blacklist:access-token', 'true', 3600);
-      expect(mockRedisService.set).toHaveBeenCalledWith('blacklist:refresh-token', 'true', 7 * 24 * 60 * 60);
+      expect(mockRedisService.set).toHaveBeenCalledWith(
+        'blacklist:refresh-token',
+        'true',
+        7 * 24 * 60 * 60,
+      );
     });
 
     it('should return error if token is invalid', async () => {

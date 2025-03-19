@@ -43,9 +43,7 @@ describe('HealthController', () => {
       };
       mockHealthService.checkHealth.mockResolvedValue(errorResponse);
 
-      await expect(controller.checkHealth()).rejects.toThrow(
-        new HttpException(errorResponse, 503),
-      );
+      await expect(controller.checkHealth()).rejects.toThrow(new HttpException(errorResponse, 503));
     });
   });
 });

@@ -13,9 +13,9 @@ export class UserRole {
   @Column({ type: 'timestamptz', default: () => 'NOW()' })
   assignedAt: Date;
 
-  @ManyToOne(() => User, (user) => user.userRoles, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, user => user.userRoles, { onDelete: 'CASCADE' })
   user: User;
 
-  @ManyToOne(() => Role, (role) => role.userRoles, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Role, role => role.userRoles, { onDelete: 'CASCADE' })
   role: Role;
 }

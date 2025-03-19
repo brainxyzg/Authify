@@ -10,7 +10,7 @@ import { User } from '../src/common/entities/user.entity';
 import { LoginMethod } from '../src/common/entities/login-method.entity';
 import { RefreshToken } from '../src/common/entities/refresh-token.entity'; // 添加 RefreshToken 实体
 import { UserRole } from '../src/common/entities/user-role.entity'; // 添加 UserRole 实体
-import { Role } from '../src/common/entities/role.entity'; 
+import { Role } from '../src/common/entities/role.entity';
 import { RedisService } from '../src/common/services/redis.service';
 import { SsoProvider } from '../src/sso/models/sso.dto';
 
@@ -73,9 +73,7 @@ describe('SsoController (e2e)', () => {
 
   describe('GET /api/v1/sso/google', () => {
     it('should redirect to Google auth URL', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/api/v1/sso/google')
-        .expect(302);
+      const response = await request(app.getHttpServer()).get('/api/v1/sso/google').expect(302);
 
       const redirectUrl = response.header.location;
       expect(redirectUrl).toContain('https://accounts.google.com/o/oauth2/v2/auth');
@@ -129,9 +127,7 @@ describe('SsoController (e2e)', () => {
       const state = 'google-test-state';
       await redisService.set(`sso:state:${state}`, SsoProvider.GOOGLE, 600);
 
-      nock('https://oauth2.googleapis.com')
-        .post('/token')
-        .reply(400, { error: 'invalid_grant' });
+      nock('https://oauth2.googleapis.com').post('/token').reply(400, { error: 'invalid_grant' });
 
       const response = await request(app.getHttpServer())
         .get('/api/v1/sso/google/callback')
@@ -145,9 +141,7 @@ describe('SsoController (e2e)', () => {
 
   describe('GET /api/v1/sso/github', () => {
     it('should redirect to GitHub auth URL', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/api/v1/sso/github')
-        .expect(302);
+      const response = await request(app.getHttpServer()).get('/api/v1/sso/github').expect(302);
 
       const redirectUrl = response.header.location;
       expect(redirectUrl).toContain('https://github.com/login/oauth/authorize');

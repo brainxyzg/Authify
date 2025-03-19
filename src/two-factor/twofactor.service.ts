@@ -6,7 +6,12 @@ import { User } from '../common/entities/user.entity';
 import { TwoFactorBackupCode } from '../common/entities/two-factor-backup-code.entity';
 import { authenticator } from 'otplib';
 import { toDataURL } from 'qrcode';
-import { Verify2FAResponseDto, Enable2FAResponseDto, GenerateBackupCodesResponseDto, Verify2FADto } from './models/twofactor.dto';
+import {
+  Verify2FAResponseDto,
+  Enable2FAResponseDto,
+  GenerateBackupCodesResponseDto,
+  Verify2FADto,
+} from './models/twofactor.dto';
 import { ApiResponse } from '../common/models/api-response.dto';
 import * as bcrypt from 'bcrypt';
 
@@ -23,7 +28,7 @@ export class TwoFactorService {
     authenticator.options = { step: 30, window: 1 }; // 30 秒周期，允许前后 1 个周期误差
   }
 
-  async enable2FA(userId: number): Promise<ApiResponse<Enable2FAResponseDto|null>> {
+  async enable2FA(userId: number): Promise<ApiResponse<Enable2FAResponseDto | null>> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       return {
@@ -50,8 +55,8 @@ export class TwoFactorService {
     // 修改这里：使用 generateBackupCodesInternal 而不是 generateBackupCodes
     const backupCodes = this.generateBackupCodesInternal(2);
 
-    let twoFactorSetting = await this.twoFactorRepository.findOne({ 
-      where: { user: { id: userId } } 
+    let twoFactorSetting = await this.twoFactorRepository.findOne({
+      where: { user: { id: userId } },
     });
     if (!twoFactorSetting) {
       twoFactorSetting = this.twoFactorRepository.create({
@@ -69,13 +74,16 @@ export class TwoFactorService {
 
     return {
       status: 'success',
-      data: { secret, qr_code_url: qrCodeUrl, backup_codes: backupCodes  },
+      data: { secret, qr_code_url: qrCodeUrl, backup_codes: backupCodes },
       message: '2FA setup initiated, please verify the code',
       code: 'SUCCESS_2FA_INIT',
     };
   }
 
-  async verify2FA(userId: number, verifyDto: Verify2FADto): Promise<ApiResponse<Verify2FAResponseDto | null>> {
+  async verify2FA(
+    userId: number,
+    verifyDto: Verify2FADto,
+  ): Promise<ApiResponse<Verify2FAResponseDto | null>> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['twoFactorSetting'],
@@ -89,7 +97,10 @@ export class TwoFactorService {
       };
     }
 
-    const isValid = authenticator.verify({ token: verifyDto.code, secret: user.twoFactorSetting.secret });
+    const isValid = authenticator.verify({
+      token: verifyDto.code,
+      secret: user.twoFactorSetting.secret,
+    });
     if (!isValid) {
       return {
         status: 'error',
@@ -124,7 +135,10 @@ export class TwoFactorService {
       };
     }
 
-    await this.twoFactorRepository.update({ userId: user.twoFactorSetting.userId }, { isEnabled: false });
+    await this.twoFactorRepository.update(
+      { userId: user.twoFactorSetting.userId },
+      { isEnabled: false },
+    );
     await this.backupCodeRepository.delete({ user: { id: userId } });
 
     return {
@@ -135,7 +149,9 @@ export class TwoFactorService {
     };
   }
 
-  async generateBackupCodes(userId: number): Promise<ApiResponse<GenerateBackupCodesResponseDto | null>> {
+  async generateBackupCodes(
+    userId: number,
+  ): Promise<ApiResponse<GenerateBackupCodesResponseDto | null>> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['twoFactorSetting'],
@@ -173,7 +189,9 @@ export class TwoFactorService {
 
   private async saveBackupCodes(user: User, codes: string[]): Promise<void> {
     const hashedCodes = await Promise.all(codes.map(code => bcrypt.hash(code, 10)));
-    const backupCodeEntities = hashedCodes.map(hash => this.backupCodeRepository.create({ user, codeHash: hash }));
+    const backupCodeEntities = hashedCodes.map(hash =>
+      this.backupCodeRepository.create({ user, codeHash: hash }),
+    );
     await this.backupCodeRepository.save(backupCodeEntities);
   }
 
@@ -190,7 +208,9 @@ export class TwoFactorService {
     const isTOTPValid = authenticator.verify({ token: code, secret: user.twoFactorSetting.secret });
     if (isTOTPValid) return true;
 
-    const backupCode = user.twoFactorBackupCodes.find(async bc => await bcrypt.compare(code, bc.codeHash));
+    const backupCode = user.twoFactorBackupCodes.find(
+      async bc => await bcrypt.compare(code, bc.codeHash),
+    );
     if (backupCode) {
       await this.backupCodeRepository.delete({ id: backupCode.id });
       return true;

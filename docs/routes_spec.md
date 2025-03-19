@@ -6,23 +6,23 @@
 
 ## 需要路由的 Handler 列表
 
-| 端点路径 | HTTP 方法 | Handler 方法 | 中间件 |
-| --- | --- | --- | --- |
-| /api/v1/public/register | POST | RegisterHandler | CORS、速率限制 |
-| /api/v1/public/forgot-password | POST | ForgotPasswordHandler | CORS、速率限制 |
-| /api/v1/public/reset-password | POST | ResetPasswordHandler | CORS、速率限制 |
-| /api/v1/auth/login | POST | LoginHandler | CORS、速率限制 |
-| /api/v1/auth/token/refresh | POST | RefreshTokenHandler | CORS、速率限制 |
-| /api/v1/auth/logout | POST | LogoutHandler | CORS、JWT 验证 |
-| /api/v1/users/me | GET | GetMeHandler | CORS、JWT 验证 |
-| /api/v1/users/me/password | PATCH | UpdatePasswordHandler | CORS、JWT 验证、速率限制 |
-| /api/v1/users/me/verify-email/send | POST | SendVerifyEmailHandler | CORS、JWT 验证、速率限制 |
-| /api/v1/users/me/verify-email | PATCH | VerifyEmailHandler | CORS、JWT 验证、速率限制 |
-| /api/v1/2fa/enable | POST | Enable2FAHandler | CORS、JWT 验证、速率限制 |
-| /api/v1/2fa/verify | POST | Verify2FAHandler | CORS、JWT 验证、速率限制 |
-| /api/v1/sso/{provider} | GET | InitiateSSOHandler | CORS、速率限制 |
-| /api/v1/sso/{provider}/callback | GET | SSOCallbackHandler | CORS、速率限制 |
-| /api/v1/health | GET | HealthCheckHandler | 安全头 |
+| 端点路径                           | HTTP 方法 | Handler 方法           | 中间件                   |
+| ---------------------------------- | --------- | ---------------------- | ------------------------ |
+| /api/v1/public/register            | POST      | RegisterHandler        | CORS、速率限制           |
+| /api/v1/public/forgot-password     | POST      | ForgotPasswordHandler  | CORS、速率限制           |
+| /api/v1/public/reset-password      | POST      | ResetPasswordHandler   | CORS、速率限制           |
+| /api/v1/auth/login                 | POST      | LoginHandler           | CORS、速率限制           |
+| /api/v1/auth/token/refresh         | POST      | RefreshTokenHandler    | CORS、速率限制           |
+| /api/v1/auth/logout                | POST      | LogoutHandler          | CORS、JWT 验证           |
+| /api/v1/users/me                   | GET       | GetMeHandler           | CORS、JWT 验证           |
+| /api/v1/users/me/password          | PATCH     | UpdatePasswordHandler  | CORS、JWT 验证、速率限制 |
+| /api/v1/users/me/verify-email/send | POST      | SendVerifyEmailHandler | CORS、JWT 验证、速率限制 |
+| /api/v1/users/me/verify-email      | PATCH     | VerifyEmailHandler     | CORS、JWT 验证、速率限制 |
+| /api/v1/2fa/enable                 | POST      | Enable2FAHandler       | CORS、JWT 验证、速率限制 |
+| /api/v1/2fa/verify                 | POST      | Verify2FAHandler       | CORS、JWT 验证、速率限制 |
+| /api/v1/sso/{provider}             | GET       | InitiateSSOHandler     | CORS、速率限制           |
+| /api/v1/sso/{provider}/callback    | GET       | SSOCallbackHandler     | CORS、速率限制           |
+| /api/v1/health                     | GET       | HealthCheckHandler     | 安全头                   |
 
 ---
 
@@ -117,30 +117,30 @@
 
 ## 状态码映射表
 
-| HTTP 状态码 | 业务场景 |
-| --- | --- |
-| 200 OK | 成功请求 |
-| 201 Created | 资源创建成功 |
-| 302 Found | 重定向 |
-| 400 Bad Request | 请求参数验证失败 |
-| 401 Unauthorized | JWT 验证失败/过期 |
-| 403 Forbidden | 权限不足 |
-| 429 Too Many Requests | 触发速率限制 |
-| 503 Service Unavailable | 服务不可用 |
+| HTTP 状态码             | 业务场景          |
+| ----------------------- | ----------------- |
+| 200 OK                  | 成功请求          |
+| 201 Created             | 资源创建成功      |
+| 302 Found               | 重定向            |
+| 400 Bad Request         | 请求参数验证失败  |
+| 401 Unauthorized        | JWT 验证失败/过期 |
+| 403 Forbidden           | 权限不足          |
+| 429 Too Many Requests   | 触发速率限制      |
+| 503 Service Unavailable | 服务不可用        |
 
 ---
 
 ## 接口分组规则
 
 1.  **公共接口**（注册/忘记密码/重置密码/登录/SSO）：
-    * 必须包含 CORS 和速率限制中间件
-    * 响应头必须包含 `Access-Control-Expose-Headers: X-RateLimit-*`
+    - 必须包含 CORS 和速率限制中间件
+    - 响应头必须包含 `Access-Control-Expose-Headers: X-RateLimit-*`
 2.  **认证接口**（用户信息/令牌刷新/登出）：
-    * 必须包含 JWT 验证中间件
-    * 启用 X-Request-ID 追踪
+    - 必须包含 JWT 验证中间件
+    - 启用 X-Request-ID 追踪
 3.  **敏感操作**（两步验证/修改密码/邮箱验证）：
-    * 强制要求 Content-Type: application/json
-    * 增加速率限制
+    - 强制要求 Content-Type: application/json
+    - 增加速率限制
 
 ---
 
@@ -155,6 +155,7 @@ corsConfig := middleware.CORSConfig{
     MaxAge:           300,
 }
 ```
+
 ---
 
 ## 路由注册规范

@@ -39,7 +39,10 @@ describe('TwoFactorController', () => {
   });
 
   it('should verify 2FA', async () => {
-    mockTwoFactorService.verify2FA.mockResolvedValue({ status: 'success', data: { two_factor_enabled: true } });
+    mockTwoFactorService.verify2FA.mockResolvedValue({
+      status: 'success',
+      data: { two_factor_enabled: true },
+    });
     const result = await controller.verify2FA(mockRequest, { code: '123456' });
     expect(result.status).toBe('success');
   });
@@ -51,7 +54,10 @@ describe('TwoFactorController', () => {
   });
 
   it('should generate backup codes', async () => {
-    mockTwoFactorService.generateBackupCodes.mockResolvedValue({ status: 'success', data: { backup_codes: ['123', '456'] } });
+    mockTwoFactorService.generateBackupCodes.mockResolvedValue({
+      status: 'success',
+      data: { backup_codes: ['123', '456'] },
+    });
     const result = await controller.generateBackupCodes(mockRequest);
     expect(result.status).toBe('success');
   });

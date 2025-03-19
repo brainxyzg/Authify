@@ -38,7 +38,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       return { status: 'error', message: `Redis ping failed: ${error.message}` };
     }
   }
-  
+
   // 在模块销毁时断开连接
   async onModuleDestroy() {
     await this.client.quit();

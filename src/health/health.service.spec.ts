@@ -38,7 +38,7 @@ describe('HealthService', () => {
     it('should return healthy status when all checks pass', async () => {
       mockUserRepository.query.mockResolvedValue([{ now: new Date().toISOString() }]);
       mockRedisService.health.mockResolvedValue({
-        "status": "ok"
+        status: 'ok',
       });
 
       const result = await service.checkHealth();

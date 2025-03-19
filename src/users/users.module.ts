@@ -17,8 +17,8 @@ import { JwtGuard } from '../common/middleware/jwt.guard';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { 
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '1h') 
+        signOptions: {
+          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '1h'),
         },
       }),
       inject: [ConfigService],

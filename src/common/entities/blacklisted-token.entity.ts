@@ -21,6 +21,6 @@ export class BlacklistedToken {
   @Column({ type: 'timestamptz', nullable: false })
   expiresAt: Date;
 
-  @ManyToOne(() => User, (user) => user.blacklistedTokens, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, user => user.blacklistedTokens, { onDelete: 'CASCADE' })
   user: User;
 }

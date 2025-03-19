@@ -31,7 +31,8 @@ export class PublicService {
       return {
         status: 'error',
         data: null,
-        message: existingUser.username === username ? 'Username already exists' : 'Email already exists',
+        message:
+          existingUser.username === username ? 'Username already exists' : 'Email already exists',
         code: 'USER_EXISTS',
       };
     }

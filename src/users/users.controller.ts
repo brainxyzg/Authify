@@ -1,4 +1,15 @@
-import { Controller, Get, Patch, Post, Body, HttpCode, HttpStatus, HttpException, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Body,
+  HttpCode,
+  HttpStatus,
+  HttpException,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUserInfoDto, ChangePasswordDto, VerifyEmailDto } from './models/users.dto';
 import { ApiResponse } from '../common/models/api-response.dto';
@@ -25,10 +36,16 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @Throttle(60 * 60, 5) // 5 次/小时
   @UseGuards(RateLimitingGuard)
-  async updateUserInfo(@Req() req, @Body() updateDto: UpdateUserInfoDto): Promise<ApiResponse<any>> {
+  async updateUserInfo(
+    @Req() req,
+    @Body() updateDto: UpdateUserInfoDto,
+  ): Promise<ApiResponse<any>> {
     const result = await this.usersService.updateUserInfo(req.user.sub, updateDto);
     if (result.status === 'error') {
-      throw new HttpException(result, result.data ? HttpStatus.BAD_REQUEST : HttpStatus.UNAUTHORIZED);
+      throw new HttpException(
+        result,
+        result.data ? HttpStatus.BAD_REQUEST : HttpStatus.UNAUTHORIZED,
+      );
     }
     return result;
   }
@@ -37,7 +54,10 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @Throttle(60 * 60, 5) // 5 次/小时
   @UseGuards(RateLimitingGuard)
-  async changePassword(@Req() req, @Body() changePasswordDto: ChangePasswordDto): Promise<ApiResponse<any>> {
+  async changePassword(
+    @Req() req,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ): Promise<ApiResponse<any>> {
     const result = await this.usersService.changePassword(req.user.sub, changePasswordDto);
     if (result.status === 'error') {
       throw new HttpException(result, HttpStatus.UNAUTHORIZED);
@@ -64,7 +84,10 @@ export class UsersController {
   async verifyEmail(@Req() req, @Body() verifyDto: VerifyEmailDto): Promise<ApiResponse<any>> {
     const result = await this.usersService.verifyEmail(req.user.sub, verifyDto);
     if (result.status === 'error') {
-      throw new HttpException(result, result.data ? HttpStatus.BAD_REQUEST : HttpStatus.UNAUTHORIZED);
+      throw new HttpException(
+        result,
+        result.data ? HttpStatus.BAD_REQUEST : HttpStatus.UNAUTHORIZED,
+      );
     }
     return result;
   }

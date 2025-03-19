@@ -2,7 +2,7 @@
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed-code'),
   compare: jest.fn().mockResolvedValue(true),
-  hashSync: jest.fn().mockReturnValue('hashed-password')
+  hashSync: jest.fn().mockReturnValue('hashed-password'),
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
@@ -74,9 +74,11 @@ describe('TwoFactorService', () => {
     }).compile();
 
     service = module.get<TwoFactorService>(TwoFactorService);
-    
+
     // 确保 service 中的 generateBackupCodesInternal 方法存在
-    jest.spyOn(service as any, 'generateBackupCodesInternal').mockReturnValue(['12345678', '87654321']);
+    jest
+      .spyOn(service as any, 'generateBackupCodesInternal')
+      .mockReturnValue(['12345678', '87654321']);
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -98,7 +100,10 @@ describe('TwoFactorService', () => {
     });
 
     it('should return error if 2FA already enabled', async () => {
-      mockUserRepository.findOne.mockResolvedValue({ ...mockUser, twoFactorSetting: { ...mockTwoFactorSetting, isEnabled: true } });
+      mockUserRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        twoFactorSetting: { ...mockTwoFactorSetting, isEnabled: true },
+      });
 
       const result = await service.enable2FA(1);
       expect(result.status).toBe('error');
@@ -108,7 +113,10 @@ describe('TwoFactorService', () => {
 
   describe('verify2FA', () => {
     it('should verify and enable 2FA', async () => {
-      mockUserRepository.findOne.mockResolvedValue({ ...mockUser, twoFactorSetting: mockTwoFactorSetting });
+      mockUserRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        twoFactorSetting: mockTwoFactorSetting,
+      });
       jest.spyOn(authenticator, 'verify').mockReturnValue(true);
       mockTwoFactorSettingRepository.save.mockResolvedValue(mockTwoFactorSetting);
 
@@ -119,7 +127,10 @@ describe('TwoFactorService', () => {
     });
 
     it('should return error if code invalid', async () => {
-      mockUserRepository.findOne.mockResolvedValue({ ...mockUser, twoFactorSetting: mockTwoFactorSetting });
+      mockUserRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        twoFactorSetting: mockTwoFactorSetting,
+      });
       jest.spyOn(authenticator, 'verify').mockReturnValue(false);
 
       const verifyDto: Verify2FADto = { code: '123456' };
@@ -131,7 +142,10 @@ describe('TwoFactorService', () => {
 
   describe('disable2FA', () => {
     it('should disable 2FA', async () => {
-      mockUserRepository.findOne.mockResolvedValue({ ...mockUser, twoFactorSetting: { ...mockTwoFactorSetting, isEnabled: true } });
+      mockUserRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        twoFactorSetting: { ...mockTwoFactorSetting, isEnabled: true },
+      });
       mockTwoFactorSettingRepository.update.mockResolvedValue({ affected: 1 });
       mockBackupCodeRepository.delete.mockResolvedValue({ affected: 2 });
 
@@ -150,7 +164,10 @@ describe('TwoFactorService', () => {
 
   describe('generateBackupCodes', () => {
     it('should generate backup codes', async () => {
-      mockUserRepository.findOne.mockResolvedValue({ ...mockUser, twoFactorSetting: { ...mockTwoFactorSetting, isEnabled: true } });
+      mockUserRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        twoFactorSetting: { ...mockTwoFactorSetting, isEnabled: true },
+      });
       mockBackupCodeRepository.delete.mockResolvedValue({ affected: 0 });
       mockBackupCodeRepository.create.mockReturnValue({});
       mockBackupCodeRepository.save.mockResolvedValue([]);
