@@ -1,14 +1,12 @@
-// src/app.module.ts
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { Module, Logger } from '@nestjs/common';
+import { ConfigModule } from './config/config.module';
+import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { CacheModule } from '@nestjs/cache-manager';
+import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
+import { redisStore } from 'cache-manager-ioredis';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import databaseConfig from './common/config/database.config';
-import jwtConfig from './common/config/jwt.config';
-import cacheConfig from './common/config/cache.config';
-import * as redisStore from 'cache-manager-redis-store';
 import { PublicModule } from './public/public.module';
 import { CommonModule } from './common/common.module';
 import { UsersModule } from './users/users.module';
@@ -16,25 +14,25 @@ import { AuthModule } from './auth/auth.module';
 import { TwoFactorModule } from './two-factor/twofactor.module';
 import { SsoModule } from './sso/sso.module';
 import { HealthModule } from './health/health.module';
-import { JwtGuard } from './common/middleware/jwt.guard';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtConfig } from './config/config.types';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      load: [databaseConfig, jwtConfig, cacheConfig],
-      envFilePath: '.env',
-    }),
+    ConfigModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService): TypeOrmModuleOptions => {
+      useFactory: async (configService: ConfigService): Promise<TypeOrmModuleOptions> => {
         const dbConfig = configService.get<TypeOrmModuleOptions>('database');
-        console.log('Database Config:', dbConfig); // 调试输出
+        if (!dbConfig) throw new Error('Database configuration is missing');
+        Logger.debug(`Database Config: ${JSON.stringify(dbConfig)}`, 'AppModule');
+        const isProduction = process.env.NODE_ENV === 'production';
         return {
           ...dbConfig,
           autoLoadEntities: true,
+          logging: !isProduction,
+          synchronize: !isProduction,
         };
       },
     }),
@@ -42,22 +40,36 @@ import { JwtModule } from '@nestjs/jwt';
       isGlobal: true,
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
+      useFactory: async (configService: ConfigService) => {
         const cache = configService.get('cache');
+        if (!cache?.host || !cache?.port) {
+          throw new Error('Redis configuration is missing host or port');
+        }
         return {
-          store: redisStore,
-          host: cache.host,
-          port: cache.port,
-          password: cache.password || undefined,
-          ttl: cache.ttl,
-          max: cache.max,
+          store: await redisStore({
+            host: cache.host,
+            port: cache.port,
+            password: cache.password || undefined,
+            ttl: cache.ttl,
+            max: cache.max,
+          }),
         };
       },
     }),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'secretKey',
-      signOptions: { expiresIn: '1h' },
+    JwtModule.registerAsync({
+      global: true, // 设置为全局模块，避免重复注册
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService): Promise<JwtModuleOptions> => {
+        const jwt = configService.get<JwtConfig>('jwt');
+        if (!jwt?.secret) throw new Error('JWT secret is missing');
+        return {
+          secret: jwt.secret,
+          signOptions: { expiresIn: jwt.accessTokenExpiration },
+        };
+      },
     }),
+    MailModule,
     CommonModule,
     PublicModule,
     AuthModule,
@@ -67,6 +79,6 @@ import { JwtModule } from '@nestjs/jwt';
     HealthModule,
   ],
   controllers: [AppController],
-  providers: [AppService, JwtGuard],
+  providers: [AppService],
 })
 export class AppModule {}

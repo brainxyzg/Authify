@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Logger } from '@nestjs/common';
 import { User } from '../common/entities/user.entity';
 import {
   HealthCheckApiResponse,
@@ -8,7 +9,6 @@ import {
   HealthErrorResponseDto,
 } from './models/health.dto';
 import { RedisService } from '../common/services/redis.service';
-import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class HealthService {
@@ -16,8 +16,8 @@ export class HealthService {
 
   constructor(
     @InjectRepository(User)
-    private userRepository: Repository<User>,
-    private redisService: RedisService,
+    private readonly userRepository: Repository<User>,
+    private readonly redisService: RedisService,
   ) {}
 
   async checkHealth(): Promise<HealthCheckApiResponse> {
@@ -28,36 +28,19 @@ export class HealthService {
     };
 
     // 检查数据库连接
-    try {
-      await this.userRepository.query('SELECT 1');
-    } catch (error) {
-      this.logger.error(`Database health check failed: ${error.message}`);
+    const dbResult = await this.checkDatabase();
+    if (!dbResult.isHealthy) {
       health.database = 'error';
       health.overall = 'unhealthy';
-      return {
-        status: 'error',
-        data: { component: 'database', reason: 'Connection failed' } as HealthErrorResponseDto,
-        message: 'Service unavailable',
-        code: 'SERVICE_UNAVAILABLE',
-      };
+      return this.errorResponse('database', dbResult.errorMessage);
     }
 
     // 检查 Redis 连接
-    try {
-      const redisHealth = await this.redisService.health();
-      if (redisHealth.status !== 'ok') {
-        throw new Error(redisHealth.message || 'Redis health check failed');
-      }
-    } catch (error) {
-      this.logger.error(`Redis health check failed: ${error.message}`);
+    const redisResult = await this.checkRedis();
+    if (!redisResult.isHealthy) {
       health.cache = 'error';
       health.overall = 'unhealthy';
-      return {
-        status: 'error',
-        data: { component: 'cache', reason: 'Connection failed' } as HealthErrorResponseDto,
-        message: 'Service unavailable',
-        code: 'SERVICE_UNAVAILABLE',
-      };
+      return this.errorResponse('cache', redisResult.errorMessage);
     }
 
     return {
@@ -65,6 +48,40 @@ export class HealthService {
       data: health,
       message: 'Service is operational',
       code: 'SUCCESS_HEALTH_CHECK',
+    };
+  }
+
+  private async checkDatabase(): Promise<{ isHealthy: boolean; errorMessage?: string }> {
+    try {
+      await this.userRepository.query('SELECT 1');
+      return { isHealthy: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown database error';
+      this.logger.error(`Database health check failed: ${message}`);
+      return { isHealthy: false, errorMessage: message };
+    }
+  }
+
+  private async checkRedis(): Promise<{ isHealthy: boolean; errorMessage?: string }> {
+    try {
+      const redisHealth = await this.redisService.health();
+      if (redisHealth.status !== 'ok') {
+        throw new Error(redisHealth.message || 'Redis health check failed');
+      }
+      return { isHealthy: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown Redis error';
+      this.logger.error(`Redis health check failed: ${message}`);
+      return { isHealthy: false, errorMessage: message };
+    }
+  }
+
+  private errorResponse(component: string, reason: string): HealthCheckApiResponse {
+    return {
+      status: 'error',
+      data: { component, reason } as HealthErrorResponseDto,
+      message: 'Service unavailable',
+      code: 'SERVICE_UNAVAILABLE',
     };
   }
 }

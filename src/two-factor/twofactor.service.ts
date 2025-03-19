@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TwoFactorSetting } from '../common/entities/two-factor-setting.entity';
-import { User } from '../common/entities/user.entity';
-import { TwoFactorBackupCode } from '../common/entities/two-factor-backup-code.entity';
+import * as bcrypt from 'bcrypt';
 import { authenticator } from 'otplib';
 import { toDataURL } from 'qrcode';
+import { User } from '../common/entities/user.entity';
+import { TwoFactorSetting } from '../common/entities/two-factor-setting.entity';
+import { TwoFactorBackupCode } from '../common/entities/two-factor-backup-code.entity';
 import {
   Verify2FAResponseDto,
   Enable2FAResponseDto,
@@ -13,62 +14,43 @@ import {
   Verify2FADto,
 } from './models/twofactor.dto';
 import { ApiResponse } from '../common/models/api-response.dto';
-import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class TwoFactorService {
+  private readonly BACKUP_CODE_COUNT = 2;
+  private readonly BACKUP_CODE_LENGTH = 8;
+
   constructor(
     @InjectRepository(User)
-    private userRepository: Repository<User>,
+    private readonly userRepository: Repository<User>,
     @InjectRepository(TwoFactorSetting)
-    private twoFactorRepository: Repository<TwoFactorSetting>,
+    private readonly twoFactorRepository: Repository<TwoFactorSetting>,
     @InjectRepository(TwoFactorBackupCode)
-    private backupCodeRepository: Repository<TwoFactorBackupCode>,
+    private readonly backupCodeRepository: Repository<TwoFactorBackupCode>,
   ) {
-    authenticator.options = { step: 30, window: 1 }; // 30 秒周期，允许前后 1 个周期误差
+    authenticator.options = { step: 30, window: 1 }; // 30秒周期，前后1个周期容差
   }
 
-  async enable2FA(userId: number): Promise<ApiResponse<Enable2FAResponseDto | null>> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'User not found',
-        code: 'USER_NOT_FOUND',
-      };
-    }
-
-    if (user.twoFactorSetting?.isEnabled) {
-      return {
-        status: 'error',
-        data: null,
-        message: '2FA already enabled',
-        code: '2FA_ALREADY_ENABLED',
-      };
-    }
-
-    const secret = authenticator.generateSecret(); // 生成 TOTP 密钥
-    const otpauthUrl = authenticator.keyuri(user.username, 'Authify', secret); // 生成 otpauth URL
-    const qrCodeUrl = await toDataURL(otpauthUrl); // 生成二维码
-
-    // 修改这里：使用 generateBackupCodesInternal 而不是 generateBackupCodes
-    const backupCodes = this.generateBackupCodesInternal(2);
-
-    let twoFactorSetting = await this.twoFactorRepository.findOne({
-      where: { user: { id: userId } },
+  async enable2FA(userId: number): Promise<ApiResponse<Enable2FAResponseDto>> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['twoFactorSetting'],
     });
-    if (!twoFactorSetting) {
-      twoFactorSetting = this.twoFactorRepository.create({
-        user,
-        secret,
-        isEnabled: false,
-      });
-    } else {
-      twoFactorSetting.secret = secret;
-      twoFactorSetting.isEnabled = false;
-      twoFactorSetting.enabledAt = undefined;
+    if (!user) return this.errorResponse('User not found', 'USER_NOT_FOUND');
+    if (user.twoFactorSetting?.isEnabled) {
+      return this.errorResponse('2FA already enabled', '2FA_ALREADY_ENABLED');
     }
+
+    const secret = authenticator.generateSecret();
+    const otpauthUrl = authenticator.keyuri(user.username, 'Authify', secret);
+    const qrCodeUrl = await toDataURL(otpauthUrl);
+    const backupCodes = this.generateBackupCodesInternal(this.BACKUP_CODE_COUNT);
+
+    const twoFactorSetting =
+      user.twoFactorSetting ?? this.twoFactorRepository.create({ user, secret, isEnabled: false });
+    twoFactorSetting.secret = secret;
+    twoFactorSetting.isEnabled = false;
+    twoFactorSetting.enabledAt = null;
     await this.twoFactorRepository.save(twoFactorSetting);
     await this.saveBackupCodes(user, backupCodes);
 
@@ -83,18 +65,13 @@ export class TwoFactorService {
   async verify2FA(
     userId: number,
     verifyDto: Verify2FADto,
-  ): Promise<ApiResponse<Verify2FAResponseDto | null>> {
+  ): Promise<ApiResponse<Verify2FAResponseDto>> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['twoFactorSetting'],
     });
     if (!user || !user.twoFactorSetting) {
-      return {
-        status: 'error',
-        data: null,
-        message: '2FA not initiated',
-        code: '2FA_NOT_INITIATED',
-      };
+      return this.errorResponse('2FA not initiated', '2FA_NOT_INITIATED');
     }
 
     const isValid = authenticator.verify({
@@ -111,6 +88,7 @@ export class TwoFactorService {
     }
 
     user.twoFactorSetting.isEnabled = true;
+    user.twoFactorSetting.enabledAt = new Date();
     await this.twoFactorRepository.save(user.twoFactorSetting);
 
     return {
@@ -126,47 +104,28 @@ export class TwoFactorService {
       where: { id: userId },
       relations: ['twoFactorSetting'],
     });
-    if (!user || !user.twoFactorSetting || !user.twoFactorSetting.isEnabled) {
-      return {
-        status: 'error',
-        data: null,
-        message: '2FA not enabled',
-        code: '2FA_NOT_ENABLED',
-      };
+    if (!user || !user.twoFactorSetting?.isEnabled) {
+      return this.errorResponse('2FA not enabled', '2FA_NOT_ENABLED');
     }
 
-    await this.twoFactorRepository.update(
-      { userId: user.twoFactorSetting.userId },
-      { isEnabled: false },
-    );
-    await this.backupCodeRepository.delete({ user: { id: userId } });
+    await Promise.all([
+      this.twoFactorRepository.update({ userId }, { isEnabled: false, enabledAt: null }),
+      this.backupCodeRepository.delete({ user: { id: userId } }),
+    ]);
 
-    return {
-      status: 'success',
-      data: null,
-      message: '2FA disabled successfully',
-      code: 'SUCCESS_DISABLE_2FA',
-    };
+    return this.successResponse('2FA disabled successfully', 'SUCCESS_DISABLE_2FA');
   }
 
-  async generateBackupCodes(
-    userId: number,
-  ): Promise<ApiResponse<GenerateBackupCodesResponseDto | null>> {
+  async generateBackupCodes(userId: number): Promise<ApiResponse<GenerateBackupCodesResponseDto>> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['twoFactorSetting'],
     });
-    if (!user || !user.twoFactorSetting || !user.twoFactorSetting.isEnabled) {
-      return {
-        status: 'error',
-        data: null,
-        message: '2FA not enabled',
-        code: '2FA_NOT_ENABLED',
-      };
+    if (!user || !user.twoFactorSetting?.isEnabled) {
+      return this.errorResponse('2FA not enabled', '2FA_NOT_ENABLED');
     }
 
-    // 修改这里：使用 generateBackupCodesInternal 而不是 generateBackupCodes1
-    const backupCodes = this.generateBackupCodesInternal(2);
+    const backupCodes = this.generateBackupCodesInternal(this.BACKUP_CODE_COUNT);
     await this.backupCodeRepository.delete({ user: { id: userId } });
     await this.saveBackupCodes(user, backupCodes);
 
@@ -178,44 +137,60 @@ export class TwoFactorService {
     };
   }
 
-  // 重命名方法：generateBackupCodes1 -> generateBackupCodesInternal
-  private generateBackupCodesInternal(count: number): string[] {
-    const codes: string[] = [];
-    for (let i = 0; i < count; i++) {
-      codes.push(Math.random().toString().slice(2, 10)); // 8位随机数字
-    }
-    return codes;
-  }
-
-  private async saveBackupCodes(user: User, codes: string[]): Promise<void> {
-    const hashedCodes = await Promise.all(codes.map(code => bcrypt.hash(code, 10)));
-    const backupCodeEntities = hashedCodes.map(hash =>
-      this.backupCodeRepository.create({ user, codeHash: hash }),
-    );
-    await this.backupCodeRepository.save(backupCodeEntities);
-  }
-
-  // 用于登录验证的公共方法
   async validate2FACode(userId: number, code: string): Promise<boolean> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['twoFactorSetting', 'twoFactorBackupCodes'],
     });
-    if (!user || !user.twoFactorSetting || !user.twoFactorSetting.isEnabled) {
-      return false;
-    }
+    if (!user || !user.twoFactorSetting?.isEnabled) return false;
 
-    const isTOTPValid = authenticator.verify({ token: code, secret: user.twoFactorSetting.secret });
+    const isTOTPValid = authenticator.verify({
+      token: code,
+      secret: user.twoFactorSetting.secret,
+    });
     if (isTOTPValid) return true;
 
-    const backupCode = user.twoFactorBackupCodes.find(
-      async bc => await bcrypt.compare(code, bc.codeHash),
-    );
+    const backupCode = await this.findValidBackupCode(user, code);
     if (backupCode) {
       await this.backupCodeRepository.delete({ id: backupCode.id });
       return true;
     }
 
     return false;
+  }
+
+  private generateBackupCodesInternal(count: number): string[] {
+    return Array.from({ length: count }, () =>
+      Math.random()
+        .toString(36)
+        .slice(2, 2 + this.BACKUP_CODE_LENGTH)
+        .toUpperCase(),
+    );
+  }
+
+  private async saveBackupCodes(user: User, codes: string[]): Promise<void> {
+    const hashedCodes = await Promise.all(codes.map(code => bcrypt.hash(code, 10)));
+    const entities = hashedCodes.map(hash =>
+      this.backupCodeRepository.create({ user, codeHash: hash }),
+    );
+    await this.backupCodeRepository.save(entities);
+  }
+
+  private async findValidBackupCode(
+    user: User,
+    code: string,
+  ): Promise<TwoFactorBackupCode | undefined> {
+    for (const bc of user.twoFactorBackupCodes ?? []) {
+      if (await bcrypt.compare(code, bc.codeHash)) return bc;
+    }
+    return undefined;
+  }
+
+  private successResponse(message: string, code: string): ApiResponse<null> {
+    return { status: 'success', data: null, message, code };
+  }
+
+  private errorResponse(message: string, code: string): ApiResponse<any> {
+    return { status: 'error', data: null, message, code };
   }
 }

@@ -5,16 +5,33 @@ import {
   HttpCode,
   HttpStatus,
   HttpException,
-  UseGuards,
   Req,
+  UseGuards,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { TwoFactorService } from './twofactor.service';
-import { Verify2FADto } from './models/twofactor.dto';
+import {
+  Verify2FADto,
+  Enable2FAResponseDto,
+  Verify2FAResponseDto,
+  GenerateBackupCodesResponseDto,
+} from './models/twofactor.dto';
 import { ApiResponse } from '../common/models/api-response.dto';
 import { JwtGuard } from '../common/middleware/jwt.guard';
-import { RateLimitingGuard } from '../common/middleware/rate-limiting.guard';
-import { Throttle } from '../common/decorators/throttle.decorator';
+import { Throttle } from '@nestjs/throttler';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse as ApiResponseDoc,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 
+interface AuthenticatedRequest extends Request {
+  user: { sub: number; username: string }; // 根据你的 JWT payload 调整
+}
+
+@ApiTags('2fa')
+@ApiBearerAuth() // 需要 JWT 认证
 @Controller('2fa')
 @UseGuards(JwtGuard)
 export class TwoFactorController {
@@ -22,52 +39,78 @@ export class TwoFactorController {
 
   @Post('enable')
   @HttpCode(HttpStatus.OK)
-  @Throttle(24 * 60 * 60, 3) // 3 次/天
-  @UseGuards(RateLimitingGuard)
-  async enable2FA(@Req() req): Promise<ApiResponse<any>> {
+  @Throttle({ default: { ttl: 24 * 60 * 60 * 1000, limit: 3 } }) // 3 次/天
+  @ApiOperation({ summary: 'Enable 2FA for the authenticated user' })
+  @ApiResponseDoc({ status: 200, description: '2FA setup initiated', type: ApiResponse })
+  @ApiResponseDoc({
+    status: 400,
+    description: 'Bad request (e.g., already enabled)',
+    type: ApiResponse,
+  })
+  async enable2FA(@Req() req: AuthenticatedRequest): Promise<ApiResponse<Enable2FAResponseDto>> {
     const result = await this.twoFactorService.enable2FA(req.user.sub);
     if (result.status === 'error') {
-      throw new HttpException(result, HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        { status: result.status, message: result.message, code: result.code },
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    return result;
+    return result as ApiResponse<Enable2FAResponseDto>;
   }
 
   @Post('verify')
   @HttpCode(HttpStatus.OK)
-  @Throttle(60 * 60, 10) // 10 次/小时
-  @UseGuards(RateLimitingGuard)
-  async verify2FA(@Req() req, @Body() verifyDto: Verify2FADto): Promise<ApiResponse<any>> {
+  @Throttle({ default: { ttl: 60 * 60 * 1000, limit: 10 } }) // 10 次/小时
+  @ApiOperation({ summary: 'Verify 2FA code to activate' })
+  @ApiResponseDoc({ status: 200, description: '2FA activated', type: ApiResponse })
+  @ApiResponseDoc({ status: 400, description: 'Invalid code', type: ApiResponse })
+  async verify2FA(
+    @Req() req: AuthenticatedRequest,
+    @Body() verifyDto: Verify2FADto,
+  ): Promise<ApiResponse<Verify2FAResponseDto>> {
     const result = await this.twoFactorService.verify2FA(req.user.sub, verifyDto);
     if (result.status === 'error') {
       throw new HttpException(
-        result,
-        result.data ? HttpStatus.BAD_REQUEST : HttpStatus.UNAUTHORIZED,
+        { status: result.status, message: result.message, code: result.code },
+        HttpStatus.BAD_REQUEST,
       );
     }
-    return result;
+    return result as ApiResponse<Verify2FAResponseDto>;
   }
 
   @Post('disable')
   @HttpCode(HttpStatus.OK)
-  @Throttle(24 * 60 * 60, 3) // 3 次/天
-  @UseGuards(RateLimitingGuard)
-  async disable2FA(@Req() req): Promise<ApiResponse<any>> {
+  @Throttle({ default: { ttl: 24 * 60 * 60 * 1000, limit: 3 } }) // 3 次/天
+  @ApiOperation({ summary: 'Disable 2FA for the authenticated user' })
+  @ApiResponseDoc({ status: 200, description: '2FA disabled', type: ApiResponse })
+  @ApiResponseDoc({ status: 400, description: '2FA not enabled', type: ApiResponse })
+  async disable2FA(@Req() req: AuthenticatedRequest): Promise<ApiResponse<null>> {
     const result = await this.twoFactorService.disable2FA(req.user.sub);
     if (result.status === 'error') {
-      throw new HttpException(result, HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        { status: result.status, message: result.message, code: result.code },
+        HttpStatus.BAD_REQUEST,
+      );
     }
     return result;
   }
 
   @Post('backup-codes/generate')
   @HttpCode(HttpStatus.OK)
-  @Throttle(24 * 60 * 60, 3) // 3 次/天
-  @UseGuards(RateLimitingGuard)
-  async generateBackupCodes(@Req() req): Promise<ApiResponse<any>> {
+  @Throttle({ default: { ttl: 24 * 60 * 60 * 1000, limit: 3 } }) // 3 次/天
+  @ApiOperation({ summary: 'Generate new 2FA backup codes' })
+  @ApiResponseDoc({ status: 200, description: 'Backup codes generated', type: ApiResponse })
+  @ApiResponseDoc({ status: 400, description: '2FA not enabled', type: ApiResponse })
+  async generateBackupCodes(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ApiResponse<GenerateBackupCodesResponseDto>> {
     const result = await this.twoFactorService.generateBackupCodes(req.user.sub);
     if (result.status === 'error') {
-      throw new HttpException(result, HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        { status: result.status, message: result.message, code: result.code },
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    return result;
+    return result as ApiResponse<GenerateBackupCodesResponseDto>;
   }
 }

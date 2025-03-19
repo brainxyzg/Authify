@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { User } from '../common/entities/user.entity';
 import { EmailVerification } from '../common/entities/email-verification.entity';
 import {
@@ -12,31 +14,27 @@ import {
   VerifyEmailResponseDto,
 } from './models/users.dto';
 import { ApiResponse } from '../common/models/api-response.dto';
-import * as bcrypt from 'bcrypt';
-import { randomBytes } from 'crypto';
+import { MailerService } from '@nestjs-modules/mailer';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+  private readonly VERIFICATION_CODE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24小时
+
   constructor(
     @InjectRepository(User)
-    private userRepository: Repository<User>,
+    private readonly userRepository: Repository<User>,
     @InjectRepository(EmailVerification)
-    private emailVerificationRepository: Repository<EmailVerification>,
+    private readonly emailVerificationRepository: Repository<EmailVerification>,
+    private readonly mailerService: MailerService,
   ) {}
 
-  async getCurrentUser(userId: number): Promise<ApiResponse<UserInfoResponseDto | null>> {
+  async getCurrentUser(userId: number): Promise<ApiResponse<UserInfoResponseDto>> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['roles', 'twoFactorSetting'],
+      relations: ['userRoles', 'twoFactorSetting'],
     });
-    if (!user) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'User not found',
-        code: 'USER_NOT_FOUND',
-      };
-    }
+    if (!user) return this.errorResponse('User not found', 'USER_NOT_FOUND');
 
     return {
       status: 'success',
@@ -44,7 +42,7 @@ export class UsersService {
         user_id: user.id.toString(),
         username: user.username,
         email: user.email,
-        roles: user.userRoles.map(role => role.role.name),
+        roles: user.userRoles?.map(role => role.role.name) ?? [],
         is_email_verified: user.emailVerified,
         two_factor_enabled: !!user.twoFactorSetting?.isEnabled,
       },
@@ -56,18 +54,11 @@ export class UsersService {
   async updateUserInfo(
     userId: number,
     updateDto: UpdateUserInfoDto,
-  ): Promise<ApiResponse<UpdateUserInfoResponseDto | null>> {
+  ): Promise<ApiResponse<UpdateUserInfoResponseDto>> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'User not found',
-        code: 'USER_NOT_FOUND',
-      };
-    }
+    if (!user) return this.errorResponse('User not found', 'USER_NOT_FOUND');
 
-    if (updateDto.username) {
+    if (updateDto.username && updateDto.username !== user.username) {
       const existingUser = await this.userRepository.findOne({
         where: { username: updateDto.username },
       });
@@ -75,7 +66,7 @@ export class UsersService {
         return {
           status: 'error',
           data: { username: user.username },
-          message: 'Update failed',
+          message: 'Username already taken',
           code: 'USERNAME_TAKEN',
         };
       }
@@ -96,96 +87,57 @@ export class UsersService {
     changePasswordDto: ChangePasswordDto,
   ): Promise<ApiResponse<null>> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'User not found',
-        code: 'USER_NOT_FOUND',
-      };
-    }
+    if (!user) return this.errorResponse('User not found', 'USER_NOT_FOUND');
 
     const isOldPasswordValid = await bcrypt.compare(
       changePasswordDto.old_password,
       user.passwordHash,
     );
     if (!isOldPasswordValid) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'Incorrect old password',
-        code: 'INCORRECT_PASSWORD',
-      };
+      return this.errorResponse('Incorrect old password', 'INCORRECT_PASSWORD');
     }
 
-    const newPasswordHash = await bcrypt.hash(changePasswordDto.new_password, 10);
-    user.passwordHash = newPasswordHash;
+    user.passwordHash = await bcrypt.hash(changePasswordDto.new_password, 10);
     await this.userRepository.save(user);
 
-    return {
-      status: 'success',
-      data: null,
-      message: 'Password updated successfully',
-      code: 'SUCCESS_UPDATE_PASSWORD',
-    };
+    return this.successResponse('Password updated successfully', 'SUCCESS_UPDATE_PASSWORD');
   }
 
   async sendVerifyEmail(userId: number): Promise<ApiResponse<null>> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'User not found',
-        code: 'USER_NOT_FOUND',
-      };
-    }
-
+    if (!user) return this.errorResponse('User not found', 'USER_NOT_FOUND');
     if (user.emailVerified) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'Email already verified',
-        code: 'EMAIL_ALREADY_VERIFIED',
-      };
+      return this.errorResponse('Email already verified', 'EMAIL_ALREADY_VERIFIED');
     }
 
-    // 修改这部分代码
-    const code = randomBytes(3).toString('hex').toUpperCase(); // 6 字符验证码
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24小时有效期
+    const code = randomBytes(3).toString('hex').toUpperCase();
+    const expiresAt = new Date(Date.now() + this.VERIFICATION_CODE_EXPIRY_MS);
 
-    // 创建一个符合 EmailVerification 实体结构的对象
-    const verification = new EmailVerification();
-    verification.user = user;
-    verification.token = code;
-    verification.expiresAt = expiresAt;
-
+    const verification = this.emailVerificationRepository.create({
+      user,
+      token: code,
+      expiresAt,
+    });
     await this.emailVerificationRepository.save(verification);
 
-    // TODO: 发送邮件逻辑（集成邮件服务）
-    console.log(`Verification code for ${user.email}: ${code}`);
+    await this.mailerService.sendMail({
+      to: user.email,
+      subject: 'Verify Your Email',
+      template: 'verify-email',
+      context: { username: user.username, code },
+    });
+    this.logger.log(`Verification email sent to ${user.email}`);
+    this.logger.log(`Verification code for ${user.email}: ${code}`);
 
-    return {
-      status: 'success',
-      data: null,
-      message: 'Verification email sent',
-      code: 'SUCCESS_SEND_VERIFY_EMAIL',
-    };
+    return this.successResponse('Verification email sent', 'SUCCESS_SEND_VERIFY_EMAIL');
   }
 
   async verifyEmail(
     userId: number,
     verifyDto: VerifyEmailDto,
-  ): Promise<ApiResponse<VerifyEmailResponseDto | null>> {
+  ): Promise<ApiResponse<VerifyEmailResponseDto>> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'User not found',
-        code: 'USER_NOT_FOUND',
-      };
-    }
+    if (!user) return this.errorResponse('User not found', 'USER_NOT_FOUND');
 
     const verification = await this.emailVerificationRepository.findOne({
       where: { user: { id: userId }, token: verifyDto.code },
@@ -194,14 +146,16 @@ export class UsersService {
       return {
         status: 'error',
         data: { is_email_verified: false },
-        message: 'Verification failed',
+        message: 'Invalid or expired verification code',
         code: 'INVALID_CODE',
       };
     }
 
     user.emailVerified = true;
-    await this.userRepository.save(user);
-    await this.emailVerificationRepository.delete({ id: verification.id });
+    await Promise.all([
+      this.userRepository.save(user),
+      this.emailVerificationRepository.delete({ id: verification.id }),
+    ]);
 
     return {
       status: 'success',
@@ -209,5 +163,13 @@ export class UsersService {
       message: 'Email verified successfully',
       code: 'SUCCESS_VERIFY_EMAIL',
     };
+  }
+
+  private successResponse(message: string, code: string): ApiResponse<null> {
+    return { status: 'success', data: null, message, code };
+  }
+
+  private errorResponse(message: string, code: string): ApiResponse<any> {
+    return { status: 'error', data: null, message, code };
   }
 }

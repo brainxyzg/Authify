@@ -9,82 +9,59 @@ import { RefreshToken } from '../common/entities/refresh-token.entity';
 import { LoginDto, LoginResponseDto } from './models/login.dto';
 import { RefreshTokenDto, RefreshTokenResponseDto } from './models/refresh-token.dto';
 import { ApiResponse } from '../common/models/api-response.dto';
-import { RedisService } from '../common/services/redis.service'; // 假设已实现 Redis 服务
+import { RedisService } from '../common/services/redis.service';
 import { TwoFactorService } from '../two-factor/twofactor.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
-    private userRepository: Repository<User>,
+    private readonly userRepository: Repository<User>,
     @InjectRepository(RefreshToken)
-    private refreshTokenRepository: Repository<RefreshToken>,
-    private jwtService: JwtService,
-    private configService: ConfigService,
-    private redisService: RedisService,
-    private twoFactorService: TwoFactorService,
+    private readonly refreshTokenRepository: Repository<RefreshToken>,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+    private readonly redisService: RedisService,
+    private readonly twoFactorService: TwoFactorService,
   ) {}
 
-  async login(loginDto: LoginDto): Promise<ApiResponse<LoginResponseDto | null>> {
-    const user = await this.userRepository.findOne({ where: { username: loginDto.username } });
-    if (!user || !(await bcrypt.compare(loginDto.password, user.passwordHash))) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'Invalid username or password',
-        code: 'INVALID_CREDENTIALS',
-      };
-    }
-
-    // 修复：显式处理 null 情况
-    const userWith2FA = await this.userRepository.findOne({
-      where: { id: user.id },
+  async login(loginDto: LoginDto): Promise<ApiResponse<LoginResponseDto>> {
+    const user = await this.userRepository.findOne({
+      where: { username: loginDto.username },
       relations: ['twoFactorSetting'],
     });
-    const twoFactorSetting = userWith2FA?.twoFactorSetting || null; // 安全获取 twoFactorSetting
 
-    if (twoFactorSetting?.isEnabled) {
+    if (!user || !(await bcrypt.compare(loginDto.password, user.passwordHash))) {
+      return this.errorResponse('Invalid username or password', 'INVALID_CREDENTIALS');
+    }
+
+    if (user.twoFactorSetting?.isEnabled) {
       if (!loginDto.twoFactorCode) {
-        return {
-          status: 'error',
-          data: null,
-          message: 'Two-factor code required',
-          code: '2FA_REQUIRED',
-        };
+        return this.errorResponse('Two-factor code required', '2FA_REQUIRED');
       }
       const isValid = await this.twoFactorService.validate2FACode(user.id, loginDto.twoFactorCode);
       if (!isValid) {
-        return {
-          status: 'error',
-          data: null,
-          message: 'Invalid 2FA code',
-          code: 'INVALID_2FA_CODE',
-        };
+        return this.errorResponse('Invalid 2FA code', 'INVALID_2FA_CODE');
       }
     }
 
     const payload = { sub: user.id, username: user.username };
-    const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.get('JWT_ACCESS_TOKEN_EXPIRY', '1h'),
-    });
-    const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.get('JWT_REFRESH_TOKEN_EXPIRY', '7d'),
-    });
+    const accessToken = this.generateAccessToken(payload);
+    const refreshToken = this.generateRefreshToken(payload);
 
-    // 保存刷新令牌到数据库
     await this.refreshTokenRepository.save({
       user,
-      token: refreshToken,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 天
+      tokenHash: refreshToken, // 存储 token 而不是 hash
+      expiresAt: new Date(Date.now() + this.getRefreshTokenExpiryMs()),
     });
 
     return {
       status: 'success',
       data: {
-        accessToken: accessToken,
+        accessToken,
         tokenType: 'bearer',
-        refreshToken: refreshToken,
-        expiresIn: 3600,
+        refreshToken,
+        expiresIn: this.getAccessTokenExpirySeconds(),
       },
       message: 'Login successful',
       code: 'SUCCESS_LOGIN',
@@ -93,49 +70,45 @@ export class AuthService {
 
   async refreshToken(
     refreshTokenDto: RefreshTokenDto,
-  ): Promise<ApiResponse<RefreshTokenResponseDto | null>> {
+  ): Promise<ApiResponse<RefreshTokenResponseDto>> {
     const token = await this.refreshTokenRepository.findOne({
       where: { tokenHash: refreshTokenDto.refreshToken },
       relations: ['user'],
     });
 
-    if (
-      !token ||
-      token.expiresAt < new Date() ||
-      (await this.redisService.get(`blacklist:${token.tokenHash}`))
-    ) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'Invalid or expired refresh token',
-        code: 'INVALID_REFRESH_TOKEN',
-      };
+    if (!token || token.expiresAt < new Date()) {
+      return this.errorResponse('Invalid or expired refresh token', 'INVALID_REFRESH_TOKEN');
     }
 
-    const payload = this.jwtService.verify(refreshTokenDto.refreshToken);
-    const newAccessToken = this.jwtService.sign(
-      { sub: payload.sub, username: payload.username },
-      {
-        expiresIn: this.configService.get('JWT_ACCESS_TOKEN_EXPIRY', '1h'),
-      },
-    );
-    const newRefreshToken = this.jwtService.sign(
-      { sub: payload.sub, username: payload.username },
-      {
-        expiresIn: this.configService.get('JWT_REFRESH_TOKEN_EXPIRY', '7d'),
-      },
-    );
+    const isBlacklisted = await this.redisService.get(`blacklist:${token.tokenHash}`);
+    if (isBlacklisted) {
+      return this.errorResponse('Refresh token has been revoked', 'REVOKED_REFRESH_TOKEN');
+    }
+
+    let payload;
+    try {
+      payload = this.jwtService.verify(refreshTokenDto.refreshToken);
+    } catch (e) {
+      return this.errorResponse('Invalid refresh token signature', 'INVALID_REFRESH_TOKEN');
+    }
+
+    const newAccessToken = this.generateAccessToken(payload);
+    const newRefreshToken = this.generateRefreshToken(payload);
 
     // 更新刷新令牌
-    token.tokenHash = newRefreshToken;
-    token.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await this.refreshTokenRepository.save(token);
+    await this.refreshTokenRepository.update(
+      { tokenHash: token.tokenHash },
+      {
+        tokenHash: newRefreshToken,
+        expiresAt: new Date(Date.now() + this.getRefreshTokenExpiryMs()),
+      },
+    );
 
     // 将旧刷新令牌加入黑名单
     await this.redisService.set(
       `blacklist:${refreshTokenDto.refreshToken}`,
       'true',
-      7 * 24 * 60 * 60,
+      this.getRefreshTokenExpirySeconds(),
     );
 
     return {
@@ -143,7 +116,7 @@ export class AuthService {
       data: {
         accessToken: newAccessToken,
         tokenType: 'bearer',
-        expiresIn: 3600,
+        expiresIn: this.getAccessTokenExpirySeconds(),
       },
       message: 'Token refreshed successfully',
       code: 'SUCCESS_REFRESH_TOKEN',
@@ -151,24 +124,36 @@ export class AuthService {
   }
 
   async logout(token: string): Promise<ApiResponse<null>> {
-    const decoded = this.jwtService.verify(token);
+    let payload;
+    try {
+      payload = this.jwtService.verify(token);
+    } catch (e) {
+      return this.errorResponse('Invalid token', 'INVALID_TOKEN');
+    }
+
     const refreshToken = await this.refreshTokenRepository.findOne({
-      where: { user: { id: decoded.sub } },
+      where: { user: { id: payload.sub } },
     });
 
-    if (!refreshToken || (await this.redisService.get(`blacklist:${token}`))) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'Invalid or already logged out',
-        code: 'INVALID_TOKEN',
-      };
+    if (!refreshToken) {
+      return this.errorResponse('No active session found', 'NO_ACTIVE_SESSION');
+    }
+
+    const isBlacklisted = await this.redisService.get(`blacklist:${refreshToken.tokenHash}`);
+    if (isBlacklisted) {
+      return this.errorResponse('Already logged out', 'ALREADY_LOGGED_OUT');
     }
 
     // 将访问令牌和刷新令牌加入黑名单
-    await this.redisService.set(`blacklist:${token}`, 'true', 3600); // 访问令牌 1 小时
-    await this.redisService.set(`blacklist:${refreshToken.tokenHash}`, 'true', 7 * 24 * 60 * 60); // 刷新令牌 7 天
-    await this.refreshTokenRepository.delete({ tokenHash: refreshToken.tokenHash });
+    await Promise.all([
+      this.redisService.set(`blacklist:${token}`, 'true', this.getAccessTokenExpirySeconds()),
+      this.redisService.set(
+        `blacklist:${refreshToken.tokenHash}`,
+        'true',
+        this.getRefreshTokenExpirySeconds(),
+      ),
+      this.refreshTokenRepository.delete({ tokenHash: refreshToken.tokenHash }),
+    ]);
 
     return {
       status: 'success',
@@ -176,5 +161,55 @@ export class AuthService {
       message: 'Logged out successfully',
       code: 'SUCCESS_LOGOUT',
     };
+  }
+
+  // 辅助方法
+  private generateAccessToken(payload: { sub: number; username: string }): string {
+    return this.jwtService.sign(payload, {
+      expiresIn: this.configService.get<string>('JWT_ACCESS_TOKEN_EXPIRY', '1h'),
+    });
+  }
+
+  private generateRefreshToken(payload: { sub: number; username: string }): string {
+    return this.jwtService.sign(payload, {
+      expiresIn: this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRY', '7d'),
+    });
+  }
+
+  private getAccessTokenExpirySeconds(): number {
+    return this.parseExpiryToSeconds(
+      this.configService.get<string>('JWT_ACCESS_TOKEN_EXPIRY', '1h'),
+    );
+  }
+
+  private getRefreshTokenExpirySeconds(): number {
+    return this.parseExpiryToSeconds(
+      this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRY', '7d'),
+    );
+  }
+
+  private getRefreshTokenExpiryMs(): number {
+    return this.getRefreshTokenExpirySeconds() * 1000;
+  }
+
+  private parseExpiryToSeconds(expiry: string): number {
+    const unit = expiry.slice(-1);
+    const value = parseInt(expiry.slice(0, -1), 10);
+    switch (unit) {
+      case 's':
+        return value;
+      case 'm':
+        return value * 60;
+      case 'h':
+        return value * 60 * 60;
+      case 'd':
+        return value * 24 * 60 * 60;
+      default:
+        return value; // 假设无单位时为秒
+    }
+  }
+
+  private errorResponse(message: string, code: string): ApiResponse<null> {
+    return { status: 'error', data: null, message, code };
   }
 }

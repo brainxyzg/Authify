@@ -1,14 +1,14 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../common/entities/user.entity';
-import { LoginMethod } from '../common/entities/login-method.entity';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { RedisService } from '../common/services/redis.service'; // 引入 RedisService
+import { randomBytes } from 'crypto';
+import { User } from '../common/entities/user.entity';
+import { LoginMethod } from '../common/entities/login-method.entity';
+import { RedisService } from '../common/services/redis.service';
 import { ApiResponse } from '../common/models/api-response.dto';
 import { SsoCallbackResponseDto, SsoProvider } from './models/sso.dto';
-import { randomBytes } from 'crypto';
 
 @Injectable()
 export class SsoService {
@@ -19,119 +19,123 @@ export class SsoService {
 
   constructor(
     @InjectRepository(User)
-    private userRepository: Repository<User>,
+    private readonly userRepository: Repository<User>,
     @InjectRepository(LoginMethod)
-    private loginMethodRepository: Repository<LoginMethod>,
-    private jwtService: JwtService,
-    private configService: ConfigService,
-    private redisService: RedisService,
+    private readonly loginMethodRepository: Repository<LoginMethod>,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+    private readonly redisService: RedisService,
   ) {
+    const baseUrl = this.configService.get<string>('BASE_URL', 'http://localhost:3000');
     this.providers = {
       [SsoProvider.GOOGLE]: {
-        clientId: this.configService.get<string>('GOOGLE_CLIENT_ID'),
-        clientSecret: this.configService.get<string>('GOOGLE_CLIENT_SECRET'),
-        redirectUri: `${this.configService.get<string>('BASE_URL')}/api/v1/sso/google/callback`,
+        clientId: this.configService.get<string>('GOOGLE_CLIENT_ID', ''),
+        clientSecret: this.configService.get<string>('GOOGLE_CLIENT_SECRET', ''),
+        redirectUri: `${baseUrl}/api/v1/sso/google/callback`,
       },
       [SsoProvider.GITHUB]: {
-        clientId: this.configService.get<string>('GITHUB_CLIENT_ID'),
-        clientSecret: this.configService.get<string>('GITHUB_CLIENT_SECRET'),
-        redirectUri: `${this.configService.get<string>('BASE_URL')}/api/v1/sso/github/callback`,
+        clientId: this.configService.get<string>('GITHUB_CLIENT_ID', ''),
+        clientSecret: this.configService.get<string>('GITHUB_CLIENT_SECRET', ''),
+        redirectUri: `${baseUrl}/api/v1/sso/github/callback`,
       },
     };
   }
 
   async initiateSso(provider: SsoProvider): Promise<string> {
-    if (!this.providers[provider]) {
+    const providerConfig = this.providers[provider];
+    if (!providerConfig || !providerConfig.clientId || !providerConfig.clientSecret) {
       throw new HttpException(
-        {
-          status: 'error',
-          data: { field: 'provider', reason: 'Unsupported provider' },
-          message: 'Invalid provider',
-          code: 'INVALID_PROVIDER',
-        },
+        this.errorResponse('Unsupported or misconfigured provider', 'INVALID_PROVIDER'),
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    const { clientId, redirectUri } = this.providers[provider];
-    const state = randomBytes(16).toString('hex'); // CSRF 防护
+    const { clientId, redirectUri } = providerConfig;
+    const state = randomBytes(16).toString('hex');
+    await this.redisService.set(`sso:state:${state}`, provider, 600); // 10分钟 TTL
 
-    // 将 state 存储到 Redis，设置 10 分钟 TTL
-    await this.redisService.set(`sso:state:${state}`, provider, 600);
-
-    let authUrl: string;
-    if (provider === SsoProvider.GOOGLE) {
-      authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=email%20profile&state=${state}`;
-    } else if (provider === SsoProvider.GITHUB) {
-      authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=user:email&state=${state}`;
-    }
-
-    return authUrl;
+    return this.buildAuthUrl(provider, clientId, redirectUri, state);
   }
 
   async handleSsoCallback(
     provider: SsoProvider,
     code: string,
     state?: string,
-  ): Promise<ApiResponse<SsoCallbackResponseDto | null>> {
-    if (!this.providers[provider]) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'Invalid provider',
-        code: 'INVALID_PROVIDER',
-      };
+  ): Promise<ApiResponse<SsoCallbackResponseDto>> {
+    const providerConfig = this.providers[provider];
+    if (!providerConfig || !providerConfig.clientId || !providerConfig.clientSecret) {
+      return this.errorResponse('Invalid provider', 'INVALID_PROVIDER');
     }
 
-    // 验证 state 参数
     if (!state) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'CSRF state parameter missing',
-        code: 'MISSING_CSRF_STATE',
-      };
+      return this.errorResponse('CSRF state parameter missing', 'MISSING_CSRF_STATE');
     }
 
     const storedProvider = await this.redisService.get(`sso:state:${state}`);
     if (!storedProvider || storedProvider !== provider) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'Invalid or expired CSRF state',
-        code: 'INVALID_CSRF_STATE',
-      };
+      return this.errorResponse('Invalid or expired CSRF state', 'INVALID_CSRF_STATE');
     }
-
-    // 验证通过后删除 state
     await this.redisService.del(`sso:state:${state}`);
 
-    const { clientId, clientSecret, redirectUri } = this.providers[provider];
-    let tokenResponse: any;
-    let userInfo: any;
-
+    const { clientId, clientSecret, redirectUri } = providerConfig;
     try {
-      if (provider === SsoProvider.GOOGLE) {
-        tokenResponse = await this.fetchGoogleToken(clientId, clientSecret, redirectUri, code);
-        userInfo = await this.fetchGoogleUserInfo(tokenResponse.access_token);
-      } else if (provider === SsoProvider.GITHUB) {
-        tokenResponse = await this.fetchGithubToken(clientId, clientSecret, redirectUri, code);
-        userInfo = await this.fetchGithubUserInfo(tokenResponse.access_token);
-      }
-    } catch (error) {
-      return {
-        status: 'error',
-        data: null,
-        message: 'SSO login failed: ' + error.message,
-        code: 'INVALID_SSO_CODE',
-      };
-    }
+      const tokenResponse =
+        provider === SsoProvider.GOOGLE
+          ? await this.fetchGoogleToken(clientId, clientSecret, redirectUri, code)
+          : await this.fetchGithubToken(clientId, clientSecret, redirectUri, code);
 
-    // 查找或创建用户
+      const userInfo =
+        provider === SsoProvider.GOOGLE
+          ? await this.fetchGoogleUserInfo(tokenResponse.access_token)
+          : await this.fetchGithubUserInfo(tokenResponse.access_token);
+
+      const user = await this.findOrCreateUser(userInfo, provider);
+      const accessToken = this.generateAccessToken(user);
+      const refreshToken = randomBytes(32).toString('hex');
+
+      await this.loginMethodRepository.save(this.loginMethodRepository.create({ provider, user }));
+
+      return {
+        status: 'success',
+        data: {
+          access_token: accessToken,
+          token_type: 'bearer',
+          refresh_token: refreshToken,
+          expires_in: this.configService.get<number>('JWT_ACCESS_TOKEN_EXPIRY_SECONDS', 3600),
+          user: { username: user.username, email: user.email },
+        },
+        message: 'SSO login successful',
+        code: 'SUCCESS_SSO_LOGIN',
+      };
+    } catch (error) {
+      return this.errorResponse(
+        `SSO login failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'INVALID_SSO_CODE',
+      );
+    }
+  }
+
+  private buildAuthUrl(
+    provider: SsoProvider,
+    clientId: string,
+    redirectUri: string,
+    state: string,
+  ): string {
+    if (provider === SsoProvider.GOOGLE) {
+      return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=email%20profile&state=${state}`;
+    }
+    return `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=user:email&state=${state}`;
+  }
+
+  private async findOrCreateUser(userInfo: any, provider: SsoProvider): Promise<User> {
     let user = await this.userRepository.findOne({ where: { email: userInfo.email } });
     if (!user) {
+      const username =
+        userInfo.username ||
+        userInfo.login ||
+        `sso_${provider.toLowerCase()}_${randomBytes(4).toString('hex')}`;
       user = this.userRepository.create({
-        username: userInfo.username || userInfo.login || `sso_${randomBytes(4).toString('hex')}`,
+        username,
         email: userInfo.email,
         emailVerified: true,
         isActive: true,
@@ -140,30 +144,14 @@ export class SsoService {
       });
       await this.userRepository.save(user);
     }
+    return user;
+  }
 
-    // 记录登录方式，包含 providerId
-    const loginMethod = this.loginMethodRepository.create({
-      provider,
-      user,
-    });
-    await this.loginMethodRepository.save(loginMethod);
-
-    // 生成令牌
-    const accessToken = this.jwtService.sign({ sub: user.id });
-    const refreshToken = randomBytes(32).toString('hex');
-
-    return {
-      status: 'success',
-      data: {
-        access_token: accessToken,
-        token_type: 'bearer',
-        refresh_token: refreshToken,
-        expires_in: 3600,
-        user: { username: user.username, email: user.email },
-      },
-      message: 'SSO login successful',
-      code: 'SUCCESS_SSO_LOGIN',
-    };
+  private generateAccessToken(user: User): string {
+    return this.jwtService.sign(
+      { sub: user.id, username: user.username },
+      { expiresIn: this.configService.get<string>('JWT_ACCESS_TOKEN_EXPIRY', '1h') },
+    );
   }
 
   private async fetchGoogleToken(
@@ -171,7 +159,7 @@ export class SsoService {
     clientSecret: string,
     redirectUri: string,
     code: string,
-  ): Promise<any> {
+  ): Promise<{ access_token: string }> {
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -187,7 +175,7 @@ export class SsoService {
     return response.json();
   }
 
-  private async fetchGoogleUserInfo(accessToken: string): Promise<any> {
+  private async fetchGoogleUserInfo(accessToken: string): Promise<{ email: string }> {
     const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -200,7 +188,7 @@ export class SsoService {
     clientSecret: string,
     redirectUri: string,
     code: string,
-  ): Promise<any> {
+  ): Promise<{ access_token: string }> {
     const response = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
@@ -215,11 +203,17 @@ export class SsoService {
     return response.json();
   }
 
-  private async fetchGithubUserInfo(accessToken: string): Promise<any> {
+  private async fetchGithubUserInfo(
+    accessToken: string,
+  ): Promise<{ email: string; login: string }> {
     const response = await fetch('https://api.github.com/user', {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!response.ok) throw new Error('Failed to fetch GitHub user info');
     return response.json();
+  }
+
+  private errorResponse(message: string, code: string): ApiResponse<null> {
+    return { status: 'error', data: null, message, code };
   }
 }

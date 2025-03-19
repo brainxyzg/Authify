@@ -13,7 +13,6 @@ export class HealthErrorResponseDto {
   reason: string;
 }
 
-// API 响应类型
-export type HealthCheckApiResponse = ApiResponse<
-  HealthCheckResponseDto | HealthErrorResponseDto | null
->;
+export type HealthCheckApiResponse =
+  | { status: 'success'; data: HealthCheckResponseDto; message: string; code: string }
+  | { status: 'error'; data: HealthErrorResponseDto; message: string; code: string };

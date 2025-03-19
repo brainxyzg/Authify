@@ -1,11 +1,9 @@
-// src/common/common.module.ts
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { JwtModule } from '@nestjs/jwt';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { RedisModule } from '@nestjs-modules/ioredis';
-import { ThrottlerModule } from '@nestjs/throttler';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
 import { SecurityHeadersMiddleware } from './middleware/security-headers.middleware';
 import { CorsMiddleware } from './middleware/cors.middleware';
@@ -14,59 +12,69 @@ import { LoggingInterceptor } from './middleware/logging.interceptor';
 import { ErrorHandlingInterceptor } from './middleware/error-handling.interceptor';
 import { JwtGuard } from './middleware/jwt.guard';
 import { AuthenticationGuard } from './middleware/authentication.guard';
-import { RateLimitingGuard } from './middleware/rate-limiting.guard';
 import { CsrfGuard } from './middleware/csrf.guard';
 import { User } from './entities/user.entity';
 import { PasswordReset } from './entities/password-reset.entity';
 import { BlacklistedToken } from './entities/blacklisted-token.entity';
+import { CacheConfig } from '../config/config.types';
 
 @Module({
   imports: [
-    ConfigModule, // 确保 ConfigService 可用
+    ConfigModule,
     TypeOrmModule.forFeature([User, PasswordReset, BlacklistedToken]),
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-      }),
-      inject: [ConfigService],
-    }),
     RedisModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'single' as const,
-        options: {
-          host: configService.get('cache.host', 'localhost'),
-          port: configService.get<number>('cache.port', 6379),
-          password: configService.get('cache.password') || undefined,
-          db: configService.get<number>('cache.db', 0),
-        },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const cacheConfig = configService.get<CacheConfig>('cache');
+        if (!cacheConfig?.host || !cacheConfig?.port) {
+          throw new Error('Redis configuration is missing');
+        }
+        return {
+          type: 'single',
+          options: {
+            host: cacheConfig.host,
+            port: cacheConfig.port,
+            password: cacheConfig.password || undefined,
+          },
+        };
+      },
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        throttlers: [
-          {
-            ttl: configService.get<number>('RATE_LIMIT_TTL', 60000), // 毫秒
-            limit: configService.get<number>('RATE_LIMIT_MAX', 10),
-          },
-        ],
-      }),
+      useFactory: async (configService: ConfigService) => [
+        {
+          name: 'default',
+          ttl: configService.get<number>('throttler.ttl', 60000),
+          limit: configService.get<number>('throttler.limit', 10),
+        },
+        {
+          name: 'strict',
+          ttl: 1000,
+          limit: 5,
+        },
+      ],
     }),
   ],
   providers: [
-    { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
-    { provide: APP_INTERCEPTOR, useClass: ErrorHandlingInterceptor },
-    { provide: APP_GUARD, useClass: RateLimitingGuard },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ErrorHandlingInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     JwtGuard,
     AuthenticationGuard,
-    RateLimitingGuard,
     CsrfGuard,
   ],
-  exports: [TypeOrmModule, JwtGuard, AuthenticationGuard, RateLimitingGuard, CsrfGuard],
+  exports: [TypeOrmModule, JwtGuard, AuthenticationGuard, CsrfGuard],
 })
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
