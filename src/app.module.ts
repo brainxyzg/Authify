@@ -16,7 +16,9 @@ import { SsoModule } from './sso/sso.module';
 import { HealthModule } from './health/health.module';
 import { JwtConfig } from './config/config.types';
 import { MailModule } from './mail/mail.module';
-
+import { User } from './common/entities/user.entity';
+import { UserRole } from './common/entities/user-role.entity';
+import { Role } from './common/entities/role.entity';
 @Module({
   imports: [
     ConfigModule,
@@ -30,6 +32,7 @@ import { MailModule } from './mail/mail.module';
         const isProduction = process.env.NODE_ENV === 'production';
         return {
           ...dbConfig,
+          entities: [User, UserRole, Role],
           autoLoadEntities: true,
           logging: !isProduction,
           synchronize: !isProduction,

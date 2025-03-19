@@ -6,7 +6,7 @@ export default registerAs(
   'database',
   () =>
     ({
-      type: parseString(process.env.DATABASE_TYPE, 'postgres', ['postgres', 'mysql', 'sqlite']),
+      type: parseString(process.env.DB_TYPE, 'postgres', ['postgres', 'mysql', 'sqlite']),
       host: parseString(process.env.DB_HOST, 'localhost'),
       port: parseNumber(process.env.DB_PORT, 5432, 1, 65535),
       username: parseString(process.env.DB_USERNAME, ''),

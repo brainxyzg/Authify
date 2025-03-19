@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { User } from '../common/entities/user.entity';
 import { RefreshToken } from '../common/entities/refresh-token.entity';
-import { RedisService } from '../common/services/redis.service';
+import { RedisService } from '../redis/redis.service';
 import { TwoFactorService } from '../two-factor/twofactor.service';
 import { LoginDto } from './models/login.dto';
 import { RefreshTokenDto } from './models/refresh-token.dto';
