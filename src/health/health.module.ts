@@ -4,7 +4,7 @@ import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
 import { User } from '../common/entities/user.entity';
 import { ConfigModule } from '@nestjs/config';
-import { RedisService } from '../common/services/redis.service';
+import { RedisService } from '../redis/redis.service';
 
 @Module({
   imports: [

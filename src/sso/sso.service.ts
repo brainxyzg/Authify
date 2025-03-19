@@ -6,7 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
 import { User } from '../common/entities/user.entity';
 import { LoginMethod } from '../common/entities/login-method.entity';
-import { RedisService } from '../common/services/redis.service';
+import { RedisService } from '../redis/redis.service';
 import { ApiResponse } from '../common/models/api-response.dto';
 import { SsoCallbackResponseDto, SsoProvider } from './models/sso.dto';
 

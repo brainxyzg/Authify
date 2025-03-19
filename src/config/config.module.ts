@@ -18,39 +18,62 @@ import mailConfig from './mail.config';
         PORT: Joi.number().min(1).max(65535).default(3000),
         NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
         LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'debug').default('info'),
+        
         // Cache 配置
         REDIS_HOST: Joi.string().hostname().default('localhost'),
         REDIS_PORT: Joi.number().min(1).max(65535).default(6379),
         REDIS_PASSWORD: Joi.string().allow('').optional(),
-        CACHE_TTL: Joi.number().min(0).default(3600),
-        CACHE_MAX: Joi.number().min(1).default(100),
-        REDIS_DB: Joi.number().min(0).max(15).default(0),
-        // Database 配置
-        DATABASE_TYPE: Joi.string().valid('postgres', 'mysql', 'sqlite').default('postgres'),
-        DATABASE_HOST: Joi.string().hostname().default('localhost'),
-        DATABASE_PORT: Joi.number().min(1).max(65535).default(5432),
-        DATABASE_USERNAME: Joi.string().required(),
-        DATABASE_PASSWORD: Joi.string().allow('').required(),
-        DATABASE_NAME: Joi.string().required(),
+        CACHE_DEFAULT_TTL: Joi.number().min(0).default(3600),
+        
+        // Database 配置 - 修改为与 .env 文件一致
+        DB_HOST: Joi.string().hostname().default('localhost'),
+        DB_PORT: Joi.number().min(1).max(65535).default(5432),
+        DB_USERNAME: Joi.string().required(),
+        DB_PASSWORD: Joi.string().allow('').required(),
+        DB_NAME: Joi.string().required(),
+        DB_SYNCHRONIZE: Joi.boolean().default(true),
+        
         // JWT 配置
         JWT_SECRET: Joi.string().min(16).required(),
         JWT_ACCESS_TOKEN_EXPIRATION: Joi.string().default('1h'),
         JWT_REFRESH_TOKEN_EXPIRATION: Joi.string().default('7d'),
         JWT_ALGORITHM: Joi.string().valid('HS256', 'HS384', 'HS512').default('HS256'),
-        // Mail 配置
-        MAIL_HOST: Joi.string().hostname().required(),
+        // Mail 配置 - 修改为可选
+        MAIL_HOST: Joi.string().hostname().when('NODE_ENV', {
+          is: 'production',
+          then: Joi.required(),
+          otherwise: Joi.optional().default('localhost'),
+        }),
         MAIL_PORT: Joi.number().min(1).max(65535).default(587),
-        MAIL_USER: Joi.string().required(),
-        MAIL_PASS: Joi.string().required(),
-        // Throttler 配置
-        THROTTLER_TTL: Joi.number().min(1000).default(60000),
-        THROTTLER_LIMIT: Joi.number().min(1).default(10),
+        MAIL_USER: Joi.string().when('NODE_ENV', {
+          is: 'production',
+          then: Joi.required(),
+          otherwise: Joi.optional().default('test@example.com'),
+        }),
+        MAIL_PASSWORD: Joi.string().when('NODE_ENV', {
+          is: 'production',
+          then: Joi.required(),
+          otherwise: Joi.optional().default('password'),
+        }),
+        MAIL_FROM: Joi.string().when('NODE_ENV', {
+          is: 'production',
+          then: Joi.required(),
+          otherwise: Joi.optional().default('Authify <no-reply@example.com>'),
+        }),
+        
+        // 中间件配置
+        CORS_ALLOWED_ORIGINS: Joi.string().default('*'),
+        RATE_LIMIT_TTL: Joi.number().default(60),
+        RATE_LIMIT_MAX: Joi.number().default(10),
       }),
       validationOptions: {
-        allowUnknown: false,
+        allowUnknown: true, // 允许未知的环境变量
         abortEarly: false,
+        // 添加日志记录
         callback: err => {
-          if (err) Logger.error(`Config validation failed: ${err.message}`, 'ConfigModule');
+          if (err) {
+            Logger.error(`Config validation failed: ${err.message}`, 'ConfigModule');
+          }
         },
       },
     }),

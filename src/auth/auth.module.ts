@@ -6,7 +6,7 @@ import { User } from '../common/entities/user.entity';
 import { RefreshToken } from '../common/entities/refresh-token.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { RedisService } from '../common/services/redis.service';
+import { RedisService } from '../redis/redis.service';
 import { TwoFactorModule } from '../two-factor/twofactor.module';
 
 @Module({

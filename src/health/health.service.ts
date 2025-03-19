@@ -8,7 +8,7 @@ import {
   HealthCheckResponseDto,
   HealthErrorResponseDto,
 } from './models/health.dto';
-import { RedisService } from '../common/services/redis.service';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class HealthService {

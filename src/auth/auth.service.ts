@@ -9,7 +9,7 @@ import { RefreshToken } from '../common/entities/refresh-token.entity';
 import { LoginDto, LoginResponseDto } from './models/login.dto';
 import { RefreshTokenDto, RefreshTokenResponseDto } from './models/refresh-token.dto';
 import { ApiResponse } from '../common/models/api-response.dto';
-import { RedisService } from '../common/services/redis.service';
+import { RedisService } from '../redis/redis.service';
 import { TwoFactorService } from '../two-factor/twofactor.service';
 
 @Injectable()

@@ -7,11 +7,13 @@ export interface AppConfig {
 }
 
 export interface CacheConfig {
+  store: 'redis';
   host: string;
   port: number;
   password?: string;
   ttl: number;
   max: number;
+  db?: number;
 }
 
 // 使用自定义接口，不扩展 TypeOrmModuleOptions
