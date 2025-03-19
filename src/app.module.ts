@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { CacheModule } from '@nestjs/cache-manager';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
-import { redisStore } from 'cache-manager-ioredis';
+import redisStore from 'cache-manager-ioredis'; // Updated import
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PublicModule } from './public/public.module';
@@ -46,18 +46,17 @@ import { MailModule } from './mail/mail.module';
           throw new Error('Redis configuration is missing host or port');
         }
         return {
-          store: await redisStore({
-            host: cache.host,
-            port: cache.port,
-            password: cache.password || undefined,
-            ttl: cache.ttl,
-            max: cache.max,
-          }),
+          store: redisStore, // Pass the store function directly
+          host: cache.host,
+          port: cache.port,
+          password: cache.password || undefined,
+          ttl: cache.ttl,
+          max: cache.max,
         };
       },
     }),
     JwtModule.registerAsync({
-      global: true, // 设置为全局模块，避免重复注册
+      global: true,
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (configService: ConfigService): Promise<JwtModuleOptions> => {
