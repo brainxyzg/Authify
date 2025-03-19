@@ -1,0 +1,59 @@
+# 编译输出
+/dist
+/node_modules
+
+# 日志
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+.env
+.env.test
+
+# 操作系统
+.DS_Store
+
+# 测试
+/coverage
+/.nyc_output
+
+# IDEs 和编辑器
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# 环境变量文件
+.env
+.env.*
+!.env.example
+!.env.test
+
+# 临时文件
+/tmp
+/temp
+
+# 数据库
+*.sqlite
+*.db
+
+# 构建工具
+.webpack/
+.serverless/
+.fusebox/
+.dynamodb/
+.tern-port
