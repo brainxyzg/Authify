@@ -1,13 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SsoService } from './sso.service';
-import { Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from '../common/entities/user.entity';
 import { LoginMethod } from '../common/entities/login-method.entity';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
 import { SsoProvider } from './models/sso.dto';
 
 // Mock 依赖
