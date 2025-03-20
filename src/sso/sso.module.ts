@@ -10,6 +10,5 @@ import { CommonModule } from '../common/common.module';
   imports: [TypeOrmModule.forFeature([User, LoginMethod]), CommonModule],
   controllers: [SsoController],
   providers: [SsoService],
-  exports: [SsoService], // 可选：导出服务供其他模块使用
 })
 export class SsoModule {}

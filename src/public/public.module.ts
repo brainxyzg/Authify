@@ -11,6 +11,5 @@ import { MailModule } from '../mail/mail.module';
   imports: [TypeOrmModule.forFeature([User, PasswordReset]), CommonModule, MailModule],
   providers: [PublicService],
   controllers: [PublicController],
-  exports: [PublicService], // 可选：导出服务供其他模块使用
 })
 export class PublicModule {}
