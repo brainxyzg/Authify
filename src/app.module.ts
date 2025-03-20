@@ -16,11 +16,6 @@ import { SsoModule } from './sso/sso.module';
 import { HealthModule } from './health/health.module';
 import { MailModule } from './mail/mail.module';
 
-// Entities
-import { User } from './common/entities/user.entity';
-import { UserRole } from './common/entities/user-role.entity';
-import { Role } from './common/entities/role.entity';
-
 // Types
 import { JwtConfig } from './config/config.types';
 
