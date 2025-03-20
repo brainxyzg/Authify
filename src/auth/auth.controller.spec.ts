@@ -1,12 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { JwtGuard } from '../common/middleware/jwt.guard';
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { LoginDto, LoginResponseDto } from './models/login.dto';
 import { RefreshTokenDto, RefreshTokenResponseDto } from './models/refresh-token.dto';
 import { ApiResponse } from '../common/models/api-response.dto';
-import { JwtGuard } from '../common/middleware/jwt.guard';
-import { RateLimitingGuard } from '../common/middleware/rate-limiting.guard';
-import { HttpException, HttpStatus } from '@nestjs/common';
 
 // Mock AuthService
 const mockAuthService = {
@@ -18,14 +17,12 @@ const mockAuthService = {
 // Mock Request 对象
 const mockRequest = {
   headers: {
-    authorization: 'Bearer mock-token',
+    authorization: 'Bearer mockToken',
   },
-  user: { sub: 'user-id-123' }, // 模拟 JWT 解析后的用户
 };
 
 describe('AuthController', () => {
   let controller: AuthController;
-  let service: AuthService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -37,132 +34,131 @@ describe('AuthController', () => {
         },
       ],
     })
-      .overrideGuard(JwtGuard)
-      .useValue({ canActivate: () => true }) // Mock JwtGuard，默认通过
-      .overrideGuard(RateLimitingGuard)
-      .useValue({ canActivate: () => true }) // Mock RateLimitingGuard，默认通过
+      .overrideGuard(JwtGuard) // 跳过 JwtGuard 的验证
+      .useValue({ canActivate: () => true })
       .compile();
 
     controller = module.get<AuthController>(AuthController);
-    service = module.get<AuthService>(AuthService);
   });
 
   afterEach(() => {
-    jest.clearAllMocks(); // 清理 mock 数据
+    jest.clearAllMocks();
   });
 
-  // 测试 login 端点
   describe('login', () => {
-    const loginDto: LoginDto = {
-      username: 'johndoe',
-      password: 'Passw0rd123',
-      twoFactorCode: '123456',
-    };
-
-    it('should successfully login and return tokens', async () => {
-      const successResponse: ApiResponse<LoginResponseDto> = {
+    it('should login successfully', async () => {
+      const loginDto: LoginDto = { username: 'testuser', password: 'password123' };
+      const response: ApiResponse<LoginResponseDto> = {
         status: 'success',
         data: {
-          accessToken: 'access-token',
           tokenType: 'bearer',
-          refreshToken: 'refresh-token',
+          accessToken: 'accessToken',
+          refreshToken: 'refreshToken',
           expiresIn: 3600,
         },
         message: 'Login successful',
-        code: 'SUCCESS_LOGIN',
+        code: 'SUCCESS',
       };
-      mockAuthService.login.mockResolvedValue(successResponse);
+      mockAuthService.login.mockResolvedValue(response);
 
       const result = await controller.login(loginDto);
-      expect(result).toEqual(successResponse);
-      expect(service.login).toHaveBeenCalledWith(loginDto);
+      expect(result).toEqual(response);
+      expect(mockAuthService.login).toHaveBeenCalledWith(loginDto);
     });
 
-    it('should throw HttpException on login error', async () => {
-      const errorResponse: ApiResponse<null> = {
+    it('should throw HttpException on login failure', async () => {
+      const loginDto: LoginDto = { username: 'testuser', password: 'wrongpass' };
+      const errorResponse: ApiResponse<any> = {
         status: 'error',
-        data: null,
-        message: 'Invalid username or password',
+        message: 'Invalid credentials',
         code: 'INVALID_CREDENTIALS',
       };
       mockAuthService.login.mockResolvedValue(errorResponse);
 
       await expect(controller.login(loginDto)).rejects.toThrow(
-        new HttpException(errorResponse, HttpStatus.UNAUTHORIZED),
+        new HttpException(
+          { status: 'error', message: 'Invalid credentials' },
+          HttpStatus.UNAUTHORIZED,
+        ),
       );
-      expect(service.login).toHaveBeenCalledWith(loginDto);
     });
   });
 
-  // 测试 refreshToken 端点
   describe('refreshToken', () => {
-    const refreshTokenDto: RefreshTokenDto = {
-      refreshToken: 'refresh-token',
-    };
-
-    it('should successfully refresh token', async () => {
-      const successResponse: ApiResponse<RefreshTokenResponseDto> = {
+    it('should refresh token successfully', async () => {
+      const refreshTokenDto: RefreshTokenDto = { refreshToken: 'refreshToken' };
+      const response: ApiResponse<RefreshTokenResponseDto> = {
         status: 'success',
         data: {
-          accessToken: 'new-access-token',
-          tokenType: 'bearer',
+          accessToken: 'newAccessToken',
           expiresIn: 3600,
+          tokenType: 'bearer',
         },
-        message: 'Token refreshed successfully',
-        code: 'SUCCESS_REFRESH_TOKEN',
+        message: 'Token refreshed',
+        code: 'SUCCESS',
       };
-      mockAuthService.refreshToken.mockResolvedValue(successResponse);
+      mockAuthService.refreshToken.mockResolvedValue(response);
 
       const result = await controller.refreshToken(refreshTokenDto);
-      expect(result).toEqual(successResponse);
-      expect(service.refreshToken).toHaveBeenCalledWith(refreshTokenDto);
+      expect(result).toEqual(response);
+      expect(mockAuthService.refreshToken).toHaveBeenCalledWith(refreshTokenDto);
     });
 
-    it('should throw HttpException on refresh token error', async () => {
-      const errorResponse: ApiResponse<null> = {
+    it('should throw HttpException on refresh failure', async () => {
+      const refreshTokenDto: RefreshTokenDto = { refreshToken: 'invalidToken' };
+      const errorResponse: ApiResponse<any> = {
         status: 'error',
-        data: null,
-        message: 'Invalid or expired refresh token',
+        message: 'Invalid refresh token',
         code: 'INVALID_REFRESH_TOKEN',
       };
       mockAuthService.refreshToken.mockResolvedValue(errorResponse);
 
       await expect(controller.refreshToken(refreshTokenDto)).rejects.toThrow(
-        new HttpException(errorResponse, HttpStatus.UNAUTHORIZED),
+        new HttpException(
+          { status: 'error', message: 'Invalid refresh token' },
+          HttpStatus.UNAUTHORIZED,
+        ),
       );
-      expect(service.refreshToken).toHaveBeenCalledWith(refreshTokenDto);
     });
   });
 
-  // 测试 logout 端点
   describe('logout', () => {
-    it('should successfully logout', async () => {
-      const successResponse: ApiResponse<null> = {
+    it('should logout successfully', async () => {
+      const response: ApiResponse<null> = {
         status: 'success',
         data: null,
-        message: 'Logged out successfully',
-        code: 'SUCCESS_LOGOUT',
+        message: 'Logout successful',
+        code: 'SUCCESS',
       };
-      mockAuthService.logout.mockResolvedValue(successResponse);
+      mockAuthService.logout.mockResolvedValue(response);
 
-      const result = await controller.logout(mockRequest);
-      expect(result).toEqual(successResponse);
-      expect(service.logout).toHaveBeenCalledWith('mock-token');
+      const result = await controller.logout(mockRequest as any);
+      expect(result).toEqual(response);
+      expect(mockAuthService.logout).toHaveBeenCalledWith('mockToken');
     });
 
-    it('should throw HttpException on logout error', async () => {
-      const errorResponse: ApiResponse<null> = {
+    it('should throw HttpException if token is missing', async () => {
+      const invalidRequest = { headers: {} }; // 没有 authorization 头
+
+      await expect(controller.logout(invalidRequest as any)).rejects.toThrow(
+        new HttpException(
+          { status: 'error', message: 'Token is required' },
+          HttpStatus.UNAUTHORIZED,
+        ),
+      );
+    });
+
+    it('should throw HttpException on logout failure', async () => {
+      const errorResponse: ApiResponse<any> = {
         status: 'error',
-        data: null,
-        message: 'Invalid or already logged out',
-        code: 'INVALID_TOKEN',
+        message: 'Logout failed',
+        code: 'LOGOUT_FAILED',
       };
       mockAuthService.logout.mockResolvedValue(errorResponse);
 
-      await expect(controller.logout(mockRequest)).rejects.toThrow(
-        new HttpException(errorResponse, HttpStatus.UNAUTHORIZED),
+      await expect(controller.logout(mockRequest as any)).rejects.toThrow(
+        new HttpException({ status: 'error', message: 'Logout failed' }, HttpStatus.UNAUTHORIZED),
       );
-      expect(service.logout).toHaveBeenCalledWith('mock-token');
     });
   });
 });

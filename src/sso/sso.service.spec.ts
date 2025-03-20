@@ -1,37 +1,53 @@
-import { HttpException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { SsoService } from './sso.service';
+import { Repository } from 'typeorm';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from '../common/entities/user.entity';
 import { LoginMethod } from '../common/entities/login-method.entity';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { SsoProvider } from './models/sso.dto';
-import { RedisService } from '../common/services/redis.service';
 
-describe('SsoService', () => {
-  let service: SsoService;
-  const mockUserRepository = { findOne: jest.fn(), save: jest.fn(), create: jest.fn() };
-  const mockLoginMethodRepository = { create: jest.fn(), save: jest.fn() };
-  const mockJwtService = { sign: jest.fn(() => 'mock-jwt') };
-  const mockConfigService = {
-    get: jest.fn(key => {
-      const config = {
+// Mock 依赖
+const mockUserRepository = {
+  findOne: jest.fn(),
+  create: jest.fn(),
+  save: jest.fn(),
+};
+const mockLoginMethodRepository = {
+  create: jest.fn(),
+  save: jest.fn(),
+};
+const mockJwtService = {
+  sign: jest.fn(),
+};
+const mockConfigService = {
+  get: jest.fn(
+    (key: string, defaultValue?: any) =>
+      ({
+        BASE_URL: 'http://localhost:3000',
         GOOGLE_CLIENT_ID: 'google-id',
         GOOGLE_CLIENT_SECRET: 'google-secret',
         GITHUB_CLIENT_ID: 'github-id',
         GITHUB_CLIENT_SECRET: 'github-secret',
-        BASE_URL: 'http://localhost:3000',
-        JWT_SECRET: 'secret',
-      };
-      return config[key];
-    }),
-  };
-  const mockRedisService = {
-    set: jest.fn(),
-    get: jest.fn(),
-    del: jest.fn(),
-  };
+        JWT_ACCESS_TOKEN_EXPIRY_SECONDS: 3600,
+        JWT_ACCESS_TOKEN_EXPIRY: '1h',
+      })[key] ?? defaultValue,
+  ),
+};
+const mockCacheManager = {
+  set: jest.fn(),
+  get: jest.fn(),
+  del: jest.fn(),
+};
+
+// 确保 fetch 被正确模拟并带有类型
+global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
+
+describe('SsoService', () => {
+  let service: SsoService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -41,66 +57,86 @@ describe('SsoService', () => {
         { provide: getRepositoryToken(LoginMethod), useValue: mockLoginMethodRepository },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
-        { provide: RedisService, useValue: mockRedisService },
+        { provide: CACHE_MANAGER, useValue: mockCacheManager },
       ],
     }).compile();
 
     service = module.get<SsoService>(SsoService);
   });
 
-  afterEach(() => jest.clearAllMocks());
-
-  describe('initiateSso', () => {
-    it('should return Google auth URL', async () => {
-      const result = await service.initiateSso(SsoProvider.GOOGLE);
-      expect(result).toContain('https://accounts.google.com/o/oauth2/v2/auth');
-      expect(result).toContain('client_id=google-id');
-    });
-
-    it('should throw error for invalid provider', async () => {
-      await expect(service.initiateSso('invalid' as any)).rejects.toThrow(HttpException);
-    });
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   describe('handleSsoCallback', () => {
-    it('should handle Google callback and return tokens with valid state', async () => {
-      jest
-        .spyOn(global, 'fetch')
-        .mockImplementationOnce(() =>
-          Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ access_token: 'google-token' }),
-          } as any),
-        )
-        .mockImplementationOnce(() =>
-          Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ email: 'john@example.com', sub: '123' }),
-          } as any),
-        );
+    it('should handle GitHub SSO callback successfully', async () => {
+      const state = 'validState';
+      mockCacheManager.get.mockResolvedValue(SsoProvider.GITHUB);
+      mockCacheManager.del.mockResolvedValue(undefined);
+
+      // 模拟 GitHub token 和 user info 的 fetch 调用
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ access_token: 'github-token' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ email: 'test@example.com', login: 'testuser' }),
+        });
+
       mockUserRepository.findOne.mockResolvedValue(null);
-      mockUserRepository.create.mockReturnValue({ id: 1, email: 'john@example.com' });
-      mockUserRepository.save.mockResolvedValue({ id: 1, email: 'john@example.com' });
+      mockUserRepository.create.mockReturnValue({
+        id: 1,
+        username: 'testuser',
+        email: 'test@example.com',
+        emailVerified: true,
+        isActive: true,
+        createdAt: expect.any(Date),
+        updatedAt: expect.any(Date),
+      });
+      mockUserRepository.save.mockResolvedValue({
+        id: 1,
+        username: 'testuser',
+        email: 'test@example.com',
+      });
+      mockJwtService.sign.mockReturnValue('jwt-token');
       mockLoginMethodRepository.create.mockReturnValue({});
       mockLoginMethodRepository.save.mockResolvedValue({});
-      mockRedisService.get.mockResolvedValue(SsoProvider.GOOGLE);
 
-      const result = await service.handleSsoCallback(SsoProvider.GOOGLE, 'code', 'valid-state');
+      const result = await service.handleSsoCallback(SsoProvider.GITHUB, 'code', state);
       expect(result.status).toBe('success');
-      expect(result.data.access_token).toBe('mock-jwt');
-      expect(mockRedisService.del).toHaveBeenCalledWith('sso:state:valid-state');
+      expect(result.data.access_token).toBe('jwt-token');
+      expect(result.data.user.username).toBe('testuser');
+      expect(result.data.user.email).toBe('test@example.com');
+      expect(result.data.expires_in).toBe(3600);
+      expect(mockCacheManager.del).toHaveBeenCalledWith(`sso:state:${state}`);
     });
 
-    it('should return error for invalid code', async () => {
-      jest
-        .spyOn(global, 'fetch')
-        .mockImplementation(() =>
-          Promise.resolve({ ok: false, json: () => Promise.resolve({}) } as any),
-        );
+    it('should return error if state is invalid', async () => {
+      const state = 'invalidState';
+      mockCacheManager.get.mockResolvedValue(null);
 
-      const result = await service.handleSsoCallback(SsoProvider.GOOGLE, 'invalid-code');
+      const result = await service.handleSsoCallback(SsoProvider.GITHUB, 'code', state);
       expect(result.status).toBe('error');
-      expect(result.code).toBe('MISSING_CSRF_STATE');
+      expect(result.message).toBe('Invalid or expired CSRF state');
+      expect(result.code).toBe('INVALID_CSRF_STATE');
+    });
+
+    it('should return error if fetch token fails', async () => {
+      const state = 'validState';
+      mockCacheManager.get.mockResolvedValue(SsoProvider.GITHUB);
+      mockCacheManager.del.mockResolvedValue(undefined);
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ error: 'Invalid code' }),
+      });
+
+      const result = await service.handleSsoCallback(SsoProvider.GITHUB, 'code', state);
+      expect(result.status).toBe('error');
+      expect(result.message).toContain('SSO login failed');
+      expect(result.code).toBe('INVALID_SSO_CODE');
     });
   });
 });

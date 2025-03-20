@@ -2,12 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug', 'verbose'], // 启用详细日志
-  });
-
-  // 全局验证管道
+export function configureApp(app: any) {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -15,16 +10,19 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
-
-  // CORS 配置（生产环境应限制 origin）
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*', // 从环境变量读取
+    origin: process.env.CORS_ORIGIN || '*',
+  });
+  app.setGlobalPrefix('api/v1');
+}
+
+export async function bootstrap() {
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
 
-  // 全局前缀
-  app.setGlobalPrefix('api/v1');
+  configureApp(app);
 
-  // 启动服务器并添加错误处理
   try {
     const port = process.env.PORT ?? 3000;
     await app.listen(port, '0.0.0.0');
@@ -34,4 +32,5 @@ async function bootstrap() {
     process.exit(1);
   }
 }
+
 bootstrap();

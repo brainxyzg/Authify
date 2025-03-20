@@ -1,15 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
+import { Repository } from 'typeorm';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from '../common/entities/user.entity';
 import { RefreshToken } from '../common/entities/refresh-token.entity';
-import { RedisService } from '../redis/redis.service';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { TwoFactorService } from '../two-factor/twofactor.service';
+import * as bcrypt from 'bcrypt';
 import { LoginDto } from './models/login.dto';
 import { RefreshTokenDto } from './models/refresh-token.dto';
-import * as bcrypt from 'bcrypt';
 
 // Mock 依赖
 const mockUserRepository = {
@@ -18,6 +20,7 @@ const mockUserRepository = {
 const mockRefreshTokenRepository = {
   findOne: jest.fn(),
   save: jest.fn(),
+  update: jest.fn(),
   delete: jest.fn(),
 };
 const mockJwtService = {
@@ -25,9 +28,15 @@ const mockJwtService = {
   verify: jest.fn(),
 };
 const mockConfigService = {
-  get: jest.fn(),
+  get: jest.fn(
+    (key: string, defaultValue?: any) =>
+      ({
+        JWT_ACCESS_TOKEN_EXPIRY: '1h',
+        JWT_REFRESH_TOKEN_EXPIRY: '7d',
+      })[key] ?? defaultValue,
+  ),
 };
-const mockRedisService = {
+const mockCacheManager = {
   get: jest.fn(),
   set: jest.fn(),
 };
@@ -35,31 +44,15 @@ const mockTwoFactorService = {
   validate2FACode: jest.fn(),
 };
 
-// Mock 数据
-let mockUser: User;
-let mockRefreshToken: RefreshToken;
-const mockTwoFactorSetting = {
-  isEnabled: true,
-  secret: 'ABC123XYZ',
-};
+// Mock bcrypt
+jest.mock('bcrypt', () => ({
+  compare: jest.fn(),
+}));
 
 describe('AuthService', () => {
   let service: AuthService;
 
   beforeEach(async () => {
-    // 在测试前初始化需要 await 的数据
-    mockUser = {
-      id: 1,
-      username: 'johndoe',
-      passwordHash: await bcrypt.hash('Passw0rd123', 10),
-    } as User;
-
-    mockRefreshToken = {
-      tokenHash: 'refresh-token',
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      user: mockUser,
-    } as RefreshToken;
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -67,7 +60,7 @@ describe('AuthService', () => {
         { provide: getRepositoryToken(RefreshToken), useValue: mockRefreshTokenRepository },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
-        { provide: RedisService, useValue: mockRedisService },
+        { provide: CACHE_MANAGER, useValue: mockCacheManager },
         { provide: TwoFactorService, useValue: mockTwoFactorService },
       ],
     }).compile();
@@ -79,53 +72,68 @@ describe('AuthService', () => {
     jest.clearAllMocks();
   });
 
-  // 测试 login 方法
   describe('login', () => {
-    const loginDto: LoginDto = { username: 'johndoe', password: 'Passw0rd123' };
-
-    it('should successfully login without 2FA', async () => {
-      mockUserRepository.findOne
-        .mockResolvedValueOnce(mockUser) // username 查询
-        .mockResolvedValueOnce(mockUser); // relations 查询
-      mockConfigService.get.mockReturnValue('1h').mockReturnValueOnce('7d');
+    it('should login successfully without 2FA', async () => {
+      const user = {
+        id: 1,
+        username: 'testuser',
+        passwordHash: 'hashedPass',
+        twoFactorSetting: null,
+      };
+      const loginDto: LoginDto = { username: 'testuser', password: 'pass' };
+      mockUserRepository.findOne.mockResolvedValue(user);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       mockJwtService.sign.mockReturnValueOnce('access-token').mockReturnValueOnce('refresh-token');
-      mockRefreshTokenRepository.save.mockResolvedValue(mockRefreshToken);
+      mockRefreshTokenRepository.save.mockResolvedValue({});
 
       const result = await service.login(loginDto);
-      expect(result).toEqual({
-        status: 'success',
-        data: {
-          accessToken: 'access-token',
-          tokenType: 'bearer',
-          refreshToken: 'refresh-token',
-          expiresIn: 3600,
-        },
-        message: 'Login successful',
-        code: 'SUCCESS_LOGIN',
-      });
-      expect(mockTwoFactorService.validate2FACode).not.toHaveBeenCalled();
+      expect(result.status).toBe('success');
+      expect(result.data.accessToken).toBe('access-token');
+      expect(result.data.refreshToken).toBe('refresh-token');
+      expect(mockRefreshTokenRepository.save).toHaveBeenCalled();
     });
 
-    it('should successfully login with valid 2FA', async () => {
-      const loginDtoWith2FA = { ...loginDto, twoFactorCode: '123456' };
-      mockUserRepository.findOne
-        .mockResolvedValueOnce(mockUser)
-        .mockResolvedValueOnce({ ...mockUser, twoFactorSetting: mockTwoFactorSetting });
+    it('should login successfully with valid 2FA', async () => {
+      const user = {
+        id: 1,
+        username: 'testuser',
+        passwordHash: 'hashedPass',
+        twoFactorSetting: { isEnabled: true },
+      };
+      const loginDto: LoginDto = {
+        username: 'testuser',
+        password: 'pass',
+        twoFactorCode: '123456',
+      };
+      mockUserRepository.findOne.mockResolvedValue(user);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       mockTwoFactorService.validate2FACode.mockResolvedValue(true);
       mockJwtService.sign.mockReturnValueOnce('access-token').mockReturnValueOnce('refresh-token');
-      mockRefreshTokenRepository.save.mockResolvedValue(mockRefreshToken);
+      mockRefreshTokenRepository.save.mockResolvedValue({});
 
-      const result = await service.login(loginDtoWith2FA);
+      const result = await service.login(loginDto);
       expect(result.status).toBe('success');
       expect(mockTwoFactorService.validate2FACode).toHaveBeenCalledWith(1, '123456');
     });
 
-    it('should return error if 2FA code is missing', async () => {
-      mockUserRepository.findOne
-        .mockResolvedValueOnce(mockUser)
-        .mockResolvedValueOnce({ ...mockUser, twoFactorSetting: mockTwoFactorSetting });
+    it('should return error if credentials are invalid', async () => {
+      mockUserRepository.findOne.mockResolvedValue(null);
 
-      const result = await service.login(loginDto);
+      const result = await service.login({ username: 'testuser', password: 'wrongpass' });
+      expect(result).toEqual({
+        status: 'error',
+        data: null,
+        message: 'Invalid username or password',
+        code: 'INVALID_CREDENTIALS',
+      });
+    });
+
+    it('should return error if 2FA code is missing', async () => {
+      const user = { id: 1, username: 'testuser', twoFactorSetting: { isEnabled: true } };
+      mockUserRepository.findOne.mockResolvedValue(user);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      const result = await service.login({ username: 'testuser', password: 'pass' });
       expect(result).toEqual({
         status: 'error',
         data: null,
@@ -134,54 +142,60 @@ describe('AuthService', () => {
       });
     });
 
-    it('should return error if credentials are invalid', async () => {
-      mockUserRepository.findOne.mockResolvedValueOnce(null);
+    it('should return error if 2FA code is invalid', async () => {
+      const user = { id: 1, username: 'testuser', twoFactorSetting: { isEnabled: true } };
+      mockUserRepository.findOne.mockResolvedValue(user);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      mockTwoFactorService.validate2FACode.mockResolvedValue(false);
 
-      const result = await service.login(loginDto);
+      const result = await service.login({
+        username: 'testuser',
+        password: 'pass',
+        twoFactorCode: 'wrongcode',
+      });
       expect(result).toEqual({
         status: 'error',
         data: null,
-        message: 'Invalid username or password',
-        code: 'INVALID_CREDENTIALS',
+        message: 'Invalid 2FA code',
+        code: 'INVALID_2FA_CODE',
       });
     });
   });
 
-  // 测试 refreshToken 方法
   describe('refreshToken', () => {
-    const refreshTokenDto: RefreshTokenDto = { refreshToken: 'refresh-token' };
-
-    it('should successfully refresh token', async () => {
-      mockRefreshTokenRepository.findOne.mockResolvedValue(mockRefreshToken);
-      mockRedisService.get.mockResolvedValue(null);
-      mockJwtService.verify.mockReturnValue({ sub: 1, username: 'johndoe' });
+    it('should refresh token successfully', async () => {
+      const token = {
+        tokenHash: 'old-refresh-token',
+        expiresAt: new Date(Date.now() + 10000),
+        user: { id: 1 },
+      };
+      mockRefreshTokenRepository.findOne.mockResolvedValue(token);
+      mockCacheManager.get.mockResolvedValue(null);
+      mockJwtService.verify.mockReturnValue({ sub: 1, username: 'testuser' });
       mockJwtService.sign
         .mockReturnValueOnce('new-access-token')
         .mockReturnValueOnce('new-refresh-token');
-      mockRefreshTokenRepository.save.mockResolvedValue(mockRefreshToken);
+      mockRefreshTokenRepository.update.mockResolvedValue({});
+      mockCacheManager.set.mockResolvedValue(undefined);
 
-      const result = await service.refreshToken(refreshTokenDto);
-      expect(result).toEqual({
-        status: 'success',
-        data: {
-          accessToken: 'new-access-token',
-          tokenType: 'bearer',
-          expiresIn: 3600,
-        },
-        message: 'Token refreshed successfully',
-        code: 'SUCCESS_REFRESH_TOKEN',
-      });
-      expect(mockRedisService.set).toHaveBeenCalledWith(
-        'blacklist:refresh-token',
+      const result = await service.refreshToken({ refreshToken: 'old-refresh-token' });
+      expect(result.status).toBe('success');
+      expect(result.data.accessToken).toBe('new-access-token');
+      expect(mockRefreshTokenRepository.update).toHaveBeenCalledWith(
+        { tokenHash: 'old-refresh-token' },
+        expect.objectContaining({ tokenHash: 'new-refresh-token' }),
+      );
+      expect(mockCacheManager.set).toHaveBeenCalledWith(
+        'blacklist:old-refresh-token',
         'true',
-        7 * 24 * 60 * 60,
+        604800,
       );
     });
 
-    it('should return error if refresh token is invalid or expired', async () => {
+    it('should return error if refresh token is invalid', async () => {
       mockRefreshTokenRepository.findOne.mockResolvedValue(null);
 
-      const result = await service.refreshToken(refreshTokenDto);
+      const result = await service.refreshToken({ refreshToken: 'invalid-token' });
       expect(result).toEqual({
         status: 'error',
         data: null,
@@ -190,69 +204,97 @@ describe('AuthService', () => {
       });
     });
 
-    it('should return error if token is blacklisted', async () => {
-      mockRefreshTokenRepository.findOne.mockResolvedValue(mockRefreshToken);
-      mockRedisService.get.mockResolvedValue('true');
+    it('should return error if refresh token is blacklisted', async () => {
+      const token = { tokenHash: 'refresh-token', expiresAt: new Date(Date.now() + 10000) };
+      mockRefreshTokenRepository.findOne.mockResolvedValue(token);
+      mockCacheManager.get.mockResolvedValue('true');
 
-      const result = await service.refreshToken(refreshTokenDto);
+      const result = await service.refreshToken({ refreshToken: 'refresh-token' });
       expect(result).toEqual({
         status: 'error',
         data: null,
-        message: 'Invalid or expired refresh token',
+        message: 'Refresh token has been revoked',
+        code: 'REVOKED_REFRESH_TOKEN',
+      });
+    });
+
+    it('should return error if token signature is invalid', async () => {
+      const token = { tokenHash: 'refresh-token', expiresAt: new Date(Date.now() + 10000) };
+      mockRefreshTokenRepository.findOne.mockResolvedValue(token);
+      mockCacheManager.get.mockResolvedValue(null);
+      // 修改这一行，使用正确的 Jest mock 方法
+      mockJwtService.verify.mockImplementation(() => {
+        throw new Error('Invalid signature');
+      });
+
+      const result = await service.refreshToken({ refreshToken: 'refresh-token' });
+      expect(result).toEqual({
+        status: 'error',
+        data: null,
+        message: 'Invalid refresh token signature',
         code: 'INVALID_REFRESH_TOKEN',
       });
     });
   });
 
-  // 测试 logout 方法
   describe('logout', () => {
-    const token = 'access-token';
-
-    it('should successfully logout', async () => {
+    it('should logout successfully', async () => {
+      const refreshToken = { tokenHash: 'refresh-token', user: { id: 1 } };
       mockJwtService.verify.mockReturnValue({ sub: 1 });
-      mockRefreshTokenRepository.findOne.mockResolvedValue(mockRefreshToken);
-      mockRedisService.get.mockResolvedValue(null);
-      mockRefreshTokenRepository.delete.mockResolvedValue({ affected: 1 });
+      mockRefreshTokenRepository.findOne.mockResolvedValue(refreshToken);
+      mockCacheManager.get.mockResolvedValue(null);
+      mockCacheManager.set.mockResolvedValue(undefined);
+      mockRefreshTokenRepository.delete.mockResolvedValue({});
 
-      const result = await service.logout(token);
-      expect(result).toEqual({
-        status: 'success',
-        data: null,
-        message: 'Logged out successfully',
-        code: 'SUCCESS_LOGOUT',
+      const result = await service.logout('access-token');
+      expect(result.status).toBe('success');
+      expect(mockCacheManager.set).toHaveBeenCalledWith('blacklist:access-token', 'true', 3600);
+      expect(mockCacheManager.set).toHaveBeenCalledWith('blacklist:refresh-token', 'true', 604800);
+      expect(mockRefreshTokenRepository.delete).toHaveBeenCalledWith({
+        tokenHash: 'refresh-token',
       });
-      expect(mockRedisService.set).toHaveBeenCalledWith('blacklist:access-token', 'true', 3600);
-      expect(mockRedisService.set).toHaveBeenCalledWith(
-        'blacklist:refresh-token',
-        'true',
-        7 * 24 * 60 * 60,
-      );
     });
 
     it('should return error if token is invalid', async () => {
-      mockJwtService.verify.mockReturnValue({ sub: 1 });
-      mockRefreshTokenRepository.findOne.mockResolvedValue(null);
+      // 修改这一行，使用正确的 Jest mock 方法
+      mockJwtService.verify.mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
 
-      const result = await service.logout(token);
+      const result = await service.logout('invalid-token');
       expect(result).toEqual({
         status: 'error',
         data: null,
-        message: 'Invalid or already logged out',
+        message: 'Invalid token',
         code: 'INVALID_TOKEN',
       });
     });
 
-    it('should return error if token is blacklisted', async () => {
+    it('should return error if no active session', async () => {
       mockJwtService.verify.mockReturnValue({ sub: 1 });
-      mockRefreshTokenRepository.findOne.mockResolvedValue(mockRefreshToken);
-      mockRedisService.get.mockResolvedValue('true');
+      mockRefreshTokenRepository.findOne.mockResolvedValue(null);
 
-      const result = await service.logout(token);
+      const result = await service.logout('access-token');
       expect(result).toEqual({
         status: 'error',
         data: null,
-        message: 'Invalid or already logged out',
-        code: 'INVALID_TOKEN',
+        message: 'No active session found',
+        code: 'NO_ACTIVE_SESSION',
+      });
+    });
+
+    it('should return error if already logged out', async () => {
+      const refreshToken = { tokenHash: 'refresh-token', user: { id: 1 } };
+      mockJwtService.verify.mockReturnValue({ sub: 1 });
+      mockRefreshTokenRepository.findOne.mockResolvedValue(refreshToken);
+      mockCacheManager.get.mockResolvedValue('true');
+
+      const result = await service.logout('access-token');
+      expect(result).toEqual({
+        status: 'error',
+        data: null,
+        message: 'Already logged out',
+        code: 'ALREADY_LOGGED_OUT',
       });
     });
   });

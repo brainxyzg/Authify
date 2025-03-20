@@ -17,7 +17,7 @@ import { HealthModule } from './health/health.module';
 import { MailModule } from './mail/mail.module';
 
 // Types
-import { JwtConfig } from './config/config.types';
+import { JwtConfig, CacheConfig } from './config/config.types';
 
 // Factory functions
 const createTypeOrmOptions = async (
@@ -37,7 +37,7 @@ const createTypeOrmOptions = async (
 };
 
 const createCacheOptions = async (configService: ConfigService) => {
-  const cache = configService.get('cache');
+  const cache = configService.get<CacheConfig>('cache');
   if (!cache) throw new Error('Cache configuration is missing in your config file');
   if (!cache.host || !cache.port) {
     throw new Error('Redis configuration must include host and port');

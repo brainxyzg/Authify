@@ -35,7 +35,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 @ApiTags('users')
-@ApiBearerAuth() // 需要 JWT 认证
+@ApiBearerAuth()
 @Controller('users')
 @UseGuards(JwtGuard)
 export class UsersController {
