@@ -18,7 +18,7 @@ import { BlacklistedToken } from './entities/blacklisted-token.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, PasswordReset, BlacklistedToken]),
+    // TypeOrmModule.forFeature([User, PasswordReset, BlacklistedToken]),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => [
@@ -52,7 +52,7 @@ import { BlacklistedToken } from './entities/blacklisted-token.entity';
     AuthenticationGuard,
     CsrfGuard,
   ],
-  exports: [TypeOrmModule, JwtGuard, AuthenticationGuard, CsrfGuard],
+  exports: [JwtGuard, AuthenticationGuard, CsrfGuard],
 })
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

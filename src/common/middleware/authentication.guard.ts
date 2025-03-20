@@ -25,7 +25,7 @@ interface JwtPayload {
 @Injectable()
 export class AuthenticationGuard implements CanActivate {
   constructor(
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache, // 替换为 CacheManager
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     @InjectRepository(BlacklistedToken)
@@ -86,8 +86,8 @@ export class AuthenticationGuard implements CanActivate {
     }
 
     // 检查数据库黑名单
-    const blacklistedToken = await this.blacklistedTokenRepository.findOne({
-      where: { tokenIdentifier: token },
+    const blacklistedToken = await this.blacklistedTokenRepository.findOneBy({
+      tokenIdentifier: token,
     });
     if (blacklistedToken) {
       const ttl = this.calculateRemainingTtl(decoded.exp); // 根据 JWT 过期时间设置缓存
