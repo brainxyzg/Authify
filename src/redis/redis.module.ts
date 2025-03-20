@@ -8,7 +8,6 @@ import { CacheConfig } from '../config/config.types';
 @Module({
   imports: [
     IORedisModule.forRootAsync({
-      // imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService): RedisModuleOptions => {
         const cacheConfig = configService.get<CacheConfig>('cache');

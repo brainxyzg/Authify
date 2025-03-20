@@ -1,8 +1,7 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
-import { RedisModule } from '@nestjs-modules/ioredis';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
 import { SecurityHeadersMiddleware } from './middleware/security-headers.middleware';

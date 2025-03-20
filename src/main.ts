@@ -27,7 +27,7 @@ async function bootstrap() {
   // 启动服务器并添加错误处理
   try {
     const port = process.env.PORT ?? 3000;
-    await app.listen(port);
+    await app.listen(port, '0.0.0.0');
     Logger.log(`应用程序运行在: ${await app.getUrl()}`, 'Bootstrap');
   } catch (error) {
     Logger.error(`启动失败: ${error.message}`, 'Bootstrap');

@@ -24,9 +24,6 @@ import { Role } from './common/entities/role.entity';
 // Types
 import { JwtConfig } from './config/config.types';
 
-// Constants
-const CORE_ENTITIES = [User, UserRole, Role];
-
 // Factory functions
 const createTypeOrmOptions = async (
   configService: ConfigService,
@@ -37,7 +34,7 @@ const createTypeOrmOptions = async (
   const isProduction = process.env.NODE_ENV === 'production';
   return {
     ...dbConfig,
-    entities: CORE_ENTITIES,
+    entities: [__dirname + '/**/*.entity{.ts,.js}'],
     autoLoadEntities: true,
     logging: !isProduction,
     synchronize: !isProduction,
@@ -62,14 +59,16 @@ const createCacheOptions = async (configService: ConfigService) => {
 };
 
 const createJwtOptions = async (configService: ConfigService): Promise<JwtModuleOptions> => {
+  Logger.debug('Initializing JWT options', 'JwtModule');
   const jwt = configService.get<JwtConfig>('jwt');
-  if (!jwt) throw new Error('JWT configuration is missing in your config file');
+  if (!jwt) throw new Error('JWT configuration is missing');
   if (!jwt.secret) throw new Error('JWT secret is required');
-
-  return {
+  const options = {
     secret: jwt.secret,
     signOptions: { expiresIn: jwt.accessTokenExpiration },
   };
+  Logger.debug('JWT options initialized', 'JwtModule');
+  return options;
 };
 
 @Module({
