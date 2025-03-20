@@ -16,32 +16,11 @@ import { CsrfGuard } from './middleware/csrf.guard';
 import { User } from './entities/user.entity';
 import { PasswordReset } from './entities/password-reset.entity';
 import { BlacklistedToken } from './entities/blacklisted-token.entity';
-import { CacheConfig } from '../config/config.types';
 
 @Module({
   imports: [
-    ConfigModule,
     TypeOrmModule.forFeature([User, PasswordReset, BlacklistedToken]),
-    RedisModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => {
-        const cacheConfig = configService.get<CacheConfig>('cache');
-        if (!cacheConfig?.host || !cacheConfig?.port) {
-          throw new Error('Redis configuration is missing');
-        }
-        return {
-          type: 'single',
-          options: {
-            host: cacheConfig.host,
-            port: cacheConfig.port,
-            password: cacheConfig.password || undefined,
-          },
-        };
-      },
-    }),
     ThrottlerModule.forRootAsync({
-      imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => [
         {
@@ -80,6 +59,6 @@ export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(RequestIdMiddleware, SecurityHeadersMiddleware, CorsMiddleware, ContentTypeMiddleware)
-      .forRoutes('*');
+      .forRoutes('/api/v1/*path');
   }
 }

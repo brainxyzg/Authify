@@ -8,7 +8,9 @@ import {
   HealthCheckResponseDto,
   HealthErrorResponseDto,
 } from './models/health.dto';
-import { RedisService } from '../redis/redis.service';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
 
 @Injectable()
 export class HealthService {
@@ -17,7 +19,7 @@ export class HealthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly redisService: RedisService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache, // 替换为 CacheManager
   ) {}
 
   async checkHealth(): Promise<HealthCheckApiResponse> {
@@ -63,11 +65,16 @@ export class HealthService {
   }
 
   private async checkRedis(): Promise<{ isHealthy: boolean; errorMessage?: string }> {
+    const testKey = 'health:check';
+    const testValue = 'ok';
     try {
-      const redisHealth = await this.redisService.health();
-      if (redisHealth.status !== 'ok') {
-        throw new Error(redisHealth.message || 'Redis health check failed');
+      // 执行简单的 set 和 get 操作来测试 Redis 连接
+      await this.cacheManager.set(testKey, testValue, 10); // 设置 TTL 为 10 秒
+      const result = await this.cacheManager.get(testKey);
+      if (result !== testValue) {
+        throw new Error('Redis returned an unexpected value');
       }
+      await this.cacheManager.del(testKey); // 清理测试键
       return { isHealthy: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown Redis error';

@@ -5,8 +5,9 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
-import { InjectRedis } from '@nestjs-modules/ioredis';
-import { Redis } from 'ioredis';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import { Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -24,7 +25,7 @@ interface JwtPayload {
 @Injectable()
 export class AuthenticationGuard implements CanActivate {
   constructor(
-    @InjectRedis() private readonly redis: Redis,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache, // 替换为 CacheManager
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     @InjectRepository(BlacklistedToken)
@@ -52,7 +53,7 @@ export class AuthenticationGuard implements CanActivate {
     const jwtConfig = this.configService.get<JwtConfig>('jwt');
 
     // 检查 Redis 黑名单
-    const isBlacklistedInCache = await this.redis.get(blacklistKey);
+    const isBlacklistedInCache = await this.cacheManager.get(blacklistKey);
     if (isBlacklistedInCache === 'true') {
       throw new HttpException(
         {
@@ -90,7 +91,7 @@ export class AuthenticationGuard implements CanActivate {
     });
     if (blacklistedToken) {
       const ttl = this.calculateRemainingTtl(decoded.exp); // 根据 JWT 过期时间设置缓存
-      await this.redis.setex(blacklistKey, ttl, 'true');
+      await this.cacheManager.set(blacklistKey, 'true', ttl);
       throw new HttpException(
         {
           statusCode: HttpStatus.UNAUTHORIZED,

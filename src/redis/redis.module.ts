@@ -1,5 +1,5 @@
 import { Module, Global } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { RedisModule as IORedisModule, RedisModuleOptions } from '@nestjs-modules/ioredis';
 import { RedisService } from './redis.service';
 import { CacheConfig } from '../config/config.types';
@@ -7,9 +7,8 @@ import { CacheConfig } from '../config/config.types';
 @Global()
 @Module({
   imports: [
-    ConfigModule,
     IORedisModule.forRootAsync({
-      imports: [ConfigModule],
+      // imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService): RedisModuleOptions => {
         const cacheConfig = configService.get<CacheConfig>('cache');

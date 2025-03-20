@@ -9,7 +9,9 @@ import { RefreshToken } from '../common/entities/refresh-token.entity';
 import { LoginDto, LoginResponseDto } from './models/login.dto';
 import { RefreshTokenDto, RefreshTokenResponseDto } from './models/refresh-token.dto';
 import { ApiResponse } from '../common/models/api-response.dto';
-import { RedisService } from '../redis/redis.service';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
 import { TwoFactorService } from '../two-factor/twofactor.service';
 
 @Injectable()
@@ -21,7 +23,7 @@ export class AuthService {
     private readonly refreshTokenRepository: Repository<RefreshToken>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly redisService: RedisService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache, // 替换为 CacheManager
     private readonly twoFactorService: TwoFactorService,
   ) {}
 
@@ -80,7 +82,7 @@ export class AuthService {
       return this.errorResponse('Invalid or expired refresh token', 'INVALID_REFRESH_TOKEN');
     }
 
-    const isBlacklisted = await this.redisService.get(`blacklist:${token.tokenHash}`);
+    const isBlacklisted = await this.cacheManager.get(`blacklist:${token.tokenHash}`);
     if (isBlacklisted) {
       return this.errorResponse('Refresh token has been revoked', 'REVOKED_REFRESH_TOKEN');
     }
@@ -105,7 +107,7 @@ export class AuthService {
     );
 
     // 将旧刷新令牌加入黑名单
-    await this.redisService.set(
+    await this.cacheManager.set(
       `blacklist:${refreshTokenDto.refreshToken}`,
       'true',
       this.getRefreshTokenExpirySeconds(),
@@ -139,15 +141,15 @@ export class AuthService {
       return this.errorResponse('No active session found', 'NO_ACTIVE_SESSION');
     }
 
-    const isBlacklisted = await this.redisService.get(`blacklist:${refreshToken.tokenHash}`);
+    const isBlacklisted = await this.cacheManager.get(`blacklist:${refreshToken.tokenHash}`);
     if (isBlacklisted) {
       return this.errorResponse('Already logged out', 'ALREADY_LOGGED_OUT');
     }
 
     // 将访问令牌和刷新令牌加入黑名单
     await Promise.all([
-      this.redisService.set(`blacklist:${token}`, 'true', this.getAccessTokenExpirySeconds()),
-      this.redisService.set(
+      this.cacheManager.set(`blacklist:${token}`, 'true', this.getAccessTokenExpirySeconds()),
+      this.cacheManager.set(
         `blacklist:${refreshToken.tokenHash}`,
         'true',
         this.getRefreshTokenExpirySeconds(),

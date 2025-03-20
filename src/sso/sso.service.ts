@@ -6,7 +6,9 @@ import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
 import { User } from '../common/entities/user.entity';
 import { LoginMethod } from '../common/entities/login-method.entity';
-import { RedisService } from '../redis/redis.service';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
 import { ApiResponse } from '../common/models/api-response.dto';
 import { SsoCallbackResponseDto, SsoProvider } from './models/sso.dto';
 
@@ -24,7 +26,7 @@ export class SsoService {
     private readonly loginMethodRepository: Repository<LoginMethod>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly redisService: RedisService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache, // 替换为 CacheManager
   ) {
     const baseUrl = this.configService.get<string>('BASE_URL', 'http://localhost:3000');
     this.providers = {
@@ -52,7 +54,7 @@ export class SsoService {
 
     const { clientId, redirectUri } = providerConfig;
     const state = randomBytes(16).toString('hex');
-    await this.redisService.set(`sso:state:${state}`, provider, 600); // 10分钟 TTL
+    await this.cacheManager.set(`sso:state:${state}`, provider, 600); // 10分钟 TTL
 
     return this.buildAuthUrl(provider, clientId, redirectUri, state);
   }
@@ -71,11 +73,11 @@ export class SsoService {
       return this.errorResponse('CSRF state parameter missing', 'MISSING_CSRF_STATE');
     }
 
-    const storedProvider = await this.redisService.get(`sso:state:${state}`);
+    const storedProvider = await this.cacheManager.get(`sso:state:${state}`);
     if (!storedProvider || storedProvider !== provider) {
       return this.errorResponse('Invalid or expired CSRF state', 'INVALID_CSRF_STATE');
     }
-    await this.redisService.del(`sso:state:${state}`);
+    await this.cacheManager.del(`sso:state:${state}`);
 
     const { clientId, clientSecret, redirectUri } = providerConfig;
     try {
