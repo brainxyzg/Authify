@@ -1,0 +1,37 @@
+name: Run Unit Tests
+
+# 触发条件：推送代码到 main 分支或创建 pull request 时运行
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 定义任务
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 设置 Node.js 环境
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22' # 更新为 v22，与本地一致
+
+      # 安装依赖
+      - name: Install dependencies
+        run: npm install
+
+      # 运行测试
+      - name: Run tests
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GITHUB_CLIENT_ID: ${{ secrets.GITHUB_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.GITHUB_CLIENT_SECRET }}
+        run: npm test
