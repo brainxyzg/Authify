@@ -52,7 +52,7 @@ import { BlacklistedToken } from './entities/blacklisted-token.entity';
     AuthenticationGuard,
     CsrfGuard,
   ],
-  exports: [JwtGuard, AuthenticationGuard, CsrfGuard],
+  // exports: [JwtGuard, AuthenticationGuard, CsrfGuard],
 })
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
