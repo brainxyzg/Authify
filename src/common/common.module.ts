@@ -18,7 +18,7 @@ import { BlacklistedToken } from './entities/blacklisted-token.entity';
 
 @Module({
   imports: [
-    // TypeOrmModule.forFeature([User, PasswordReset, BlacklistedToken]),
+    TypeOrmModule.forFeature([User, PasswordReset, BlacklistedToken]),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => [
