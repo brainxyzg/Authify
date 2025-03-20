@@ -2,7 +2,7 @@
 
 Authify 是一个基于 NestJS 构建的完整身份认证与授权解决方案，提供安全、可扩展的用户管理系统，支持多种认证方式和精细的权限控制。
 
-![Coverage](https://codecov.io/gh/brainxyzg/authify/branch/main/graph/badge.svg?token=YOUR_CODECOV_TOKEN)  
+![Coverage](https://codecov.io/gh/brainxyzg/Authify/branch/main/graph/badge.svg?token=YOUR_CODECOV_TOKEN)  
 ![Build Status](https://github.com/brainxyzg/authify/actions/workflows/test.yml/badge.svg)
 ## 功能特点
 
